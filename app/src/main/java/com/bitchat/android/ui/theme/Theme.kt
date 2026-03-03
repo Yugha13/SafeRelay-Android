@@ -16,39 +16,53 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 
-// Colors that match the iOS bitchat theme
+// SafeRelay Emergency Color Scheme – matches iOS SafeRelay theme
+// Dark: Red-on-Black emergency aesthetic
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF39FF14),        // Bright green (terminal-like)
-    onPrimary = Color.Black,
-    secondary = Color(0xFF2ECB10),      // Darker green
-    onSecondary = Color.Black,
-    background = Color.Black,
-    onBackground = Color(0xFF39FF14),   // Green on black
-    surface = Color(0xFF111111),        // Very dark gray
-    onSurface = Color(0xFF39FF14),      // Green text
-    error = Color(0xFFFF5555),          // Red for errors
-    onError = Color.Black
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF008000),        // Dark green
+    primary = Color(0xFFFF3B30),        // Emergency red (iOS `Color.red`)
     onPrimary = Color.White,
-    secondary = Color(0xFF006600),      // Even darker green
-    onSecondary = Color.White,
-    background = Color.White,
-    onBackground = Color(0xFF008000),   // Dark green on white
-    surface = Color(0xFFF8F8F8),        // Very light gray
-    onSurface = Color(0xFF008000),      // Dark green text
-    error = Color(0xFFCC0000),          // Dark red for errors
-    onError = Color.White
+    secondary = Color(0xFFFF9500),      // Urgent orange
+    onSecondary = Color.Black,
+    background = Color(0xFF000000),     // Pure black
+    onBackground = Color(0xFFFF3B30),   // Red on black
+    surface = Color(0xFF111111),        // Very dark gray
+    onSurface = Color(0xFFFF3B30),      // Red text
+    surfaceVariant = Color(0xFF1A1A1A), // Slightly lighter dark
+    onSurfaceVariant = Color(0xFFFF9500),
+    error = Color(0xFFFF5555),
+    onError = Color.Black,
+    outline = Color(0xFF3A3A3A)
 )
 
+// Light: Softer red on white for daylight readability
+private val LightColorScheme = lightColorScheme(
+    primary = Color(0xFFCC0000),        // Dark red
+    onPrimary = Color.White,
+    secondary = Color(0xFFE65100),      // Dark orange
+    onSecondary = Color.White,
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFFCC0000),
+    surface = Color(0xFFF8F8F8),
+    onSurface = Color(0xFFCC0000),
+    surfaceVariant = Color(0xFFFFF0F0),
+    onSurfaceVariant = Color(0xFFE65100),
+    error = Color(0xFFCC0000),
+    onError = Color.White,
+    outline = Color(0xFFE0E0E0)
+)
+
+// Alias kept for call-site compatibility
 @Composable
 fun BitchatTheme(
     darkTheme: Boolean? = null,
     content: @Composable () -> Unit
+) = SafeRelayTheme(darkTheme = darkTheme, content = content)
+
+@Composable
+fun SafeRelayTheme(
+    darkTheme: Boolean? = null,
+    content: @Composable () -> Unit
 ) {
-    // App-level override from ThemePreferenceManager
     val themePref by ThemePreferenceManager.themeFlow.collectAsState(initial = ThemePreference.System)
     val shouldUseDark = when (darkTheme) {
         true -> true

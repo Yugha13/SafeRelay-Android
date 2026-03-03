@@ -1,0 +1,101 @@
+package com.bitchat.android.ui
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import com.bitchat.android.model.EmergencyMessageType
+import com.bitchat.android.model.GeoLocation
+import com.bitchat.android.model.PriorityLevel
+import com.bitchat.android.model.BitchatMessage
+import java.util.Date
+import java.util.UUID
+
+/**
+ * SOS Manager – mirrors iOS SafeRelay SOS send logic.
+ *
+ * Triggered when user holds the ⚠️ SOS button for 3 seconds.
+ * Attaches GPS location, battery %, and triggers haptic + alert sound.
+ */
+object SosManager {
+
+    private var alertPlayer: MediaPlayer? = null
+
+    /**
+     * Build an SOS message ready to send over the mesh.
+     * @param senderNickname  The user's nickname
+     * @param location        Last known GPS fix (may be null if unavailable)
+     * @param batteryPercent  Current battery level 0–100
+     */
+    fun buildSosMessage(
+        senderNickname: String,
+        location: GeoLocation?,
+        batteryPercent: Int
+    ): BitchatMessage {
+        val locationPart = if (location != null) {
+            "\n📍 GPS: ${location.latitude}, ${location.longitude}"
+        } else ""
+
+        val content = "🆘 SOS EMERGENCY\nSender: @$senderNickname\nBattery: $batteryPercent%$locationPart\nPlease respond immediately!"
+
+        return BitchatMessage(
+            id = UUID.randomUUID().toString().uppercase(),
+            sender = senderNickname,
+            content = content,
+            timestamp = Date(),
+            isRelay = false,
+            emergencyType = EmergencyMessageType.SOS,
+            priorityLevel = PriorityLevel.CRITICAL,
+            geoLocation = location
+        )
+    }
+
+    /**
+     * Trigger haptic feedback for SOS send confirmation.
+     * Matches iOS UINotificationFeedbackGenerator.notificationOccurred(.success).
+     */
+    fun triggerSosHaptic(context: Context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                val v = vm.defaultVibrator
+                // Three sharp pulses = success confirmation
+                v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 100, 80, 150, 80, 200), -1))
+            } else {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                @Suppress("DEPRECATION")
+                v?.vibrate(longArrayOf(0, 100, 80, 150, 80, 200), -1)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Trigger haptic feedback for SOS INCOMING alert.
+     * Continuous pulsing to draw attention.
+     */
+    fun triggerIncomingSosHaptic(context: Context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vm.defaultVibrator.vibrate(
+                    VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300, 200, 300), -1)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                @Suppress("DEPRECATION")
+                v?.vibrate(longArrayOf(0, 300, 200, 300, 200, 300), -1)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Whether this BitchatMessage is a SafeRelay emergency message (SOS or higher priority).
+     */
+    fun BitchatMessage.isSosAlert(): Boolean =
+        emergencyType == EmergencyMessageType.SOS && priorityLevel == PriorityLevel.CRITICAL
+}

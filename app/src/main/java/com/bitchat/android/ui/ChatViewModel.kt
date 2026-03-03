@@ -151,6 +151,8 @@ class ChatViewModel(
     val messages: StateFlow<List<BitchatMessage>> = state.messages
     val connectedPeers: StateFlow<List<String>> = state.connectedPeers
     val nickname: StateFlow<String> = state.nickname
+    /** Convenience accessor for SafeRelay screens */
+    val myNickname: String get() = state.getNicknameValue() ?: meshService.myPeerID
     val isConnected: StateFlow<Boolean> = state.isConnected
     val privateChats: StateFlow<Map<String, List<BitchatMessage>>> = state.privateChats
     val selectedPrivateChatPeer: StateFlow<String?> = state.selectedPrivateChatPeer
@@ -576,6 +578,22 @@ class ChatViewModel(
                     meshService.sendMessage(content, mentions, null)
                 }
             }
+        }
+    }
+
+    // MARK: - SafeRelay Emergency Message Sending
+
+    /**
+     * Send a pre-built emergency message (SOS, SAFE_STATUS, etc.) directly over the mesh.
+     * Mirrors iOS SafeRelay viewModel.sendSOS().
+     */
+    fun sendEmergencyMessage(message: BitchatMessage) {
+        try {
+            messageManager.addMessage(message)
+            // Broadcast via mesh with no channel filter so it propagates to all nodes
+            meshService.sendMessage(message.content, emptyList(), null)
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "sendEmergencyMessage failed: ${e.message}")
         }
     }
 

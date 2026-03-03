@@ -15,6 +15,17 @@ enum class BitchatMessageType : Parcelable {
     File
 }
 
+// Emergency type display helper
+val EmergencyMessageType.displayLabel: String
+    get() = when (this) {
+        EmergencyMessageType.NORMAL -> "Message"
+        EmergencyMessageType.SOS -> "🆘 SOS"
+        EmergencyMessageType.BROADCAST -> "📢 Broadcast"
+        EmergencyMessageType.RESOURCE_UPDATE -> "📦 Resource Update"
+        EmergencyMessageType.MEDICAL_REQUEST -> "🏥 Medical Request"
+        EmergencyMessageType.SAFE_STATUS -> "✅ Safe"
+    }
+
 /**
  * Delivery status for messages - exact same as iOS version
  */
@@ -69,7 +80,11 @@ data class BitchatMessage(
     val encryptedContent: ByteArray? = null,
     val isEncrypted: Boolean = false,
     val deliveryStatus: DeliveryStatus? = null,
-    val powDifficulty: Int? = null
+    val powDifficulty: Int? = null,
+    // SafeRelay emergency fields (iOS-compatible)
+    val emergencyType: EmergencyMessageType = EmergencyMessageType.NORMAL,
+    val priorityLevel: PriorityLevel = PriorityLevel.INFO,
+    val geoLocation: GeoLocation? = null
 ) : Parcelable {
 
     /**

@@ -290,21 +290,27 @@ class MainActivity : OrientationAwareActivity() {
                 // Set up back navigation handling for the chat screen
                 val backCallback = object : OnBackPressedCallback(true) {
                     override fun handleOnBackPressed() {
-                        // Let ChatViewModel handle navigation state
                         val handled = chatViewModel.handleBackPressed()
                         if (!handled) {
-                            // If ChatViewModel doesn't handle it, disable this callback
-                            // and let the system handle it (which will exit the app)
                             this.isEnabled = false
                             onBackPressedDispatcher.onBackPressed()
                             this.isEnabled = true
                         }
                     }
                 }
-
-                // Add the callback - this will be automatically removed when the activity is destroyed
                 onBackPressedDispatcher.addCallback(this, backCallback)
-                ChatScreen(viewModel = chatViewModel)
+
+                // SafeRelay emergency UI — tap "SafeRelay/" brand title to toggle mesh chat
+                var showMeshChat by remember { mutableStateOf(false) }
+                if (showMeshChat) {
+                    ChatScreen(viewModel = chatViewModel)
+                } else {
+                    com.bitchat.android.ui.SafeRelayMainScreen(
+                        viewModel = chatViewModel,
+                        onOpenMeshChat = { showMeshChat = true },
+                        onOpenProfile = {}
+                    )
+                }
             }
             
             OnboardingState.ERROR -> {
