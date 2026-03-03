@@ -69,6 +69,7 @@ enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphic
 fun SafeRelayMainScreen(
     viewModel: ChatViewModel,
     onOpenMeshChat: () -> Unit = {},
+    onOpenPrivateChat: (String, String) -> Unit = { _, _ -> },
     onOpenProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -118,13 +119,22 @@ fun SafeRelayMainScreen(
                 when (selectedTab) {
                     SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile)
                     SafeRelayTab.FEED   -> EmergencyFeedTab(messages = messages, viewModel = viewModel)
-                    SafeRelayTab.MAP    -> DisasterMapTab(messages = messages)
+                    SafeRelayTab.MAP    -> DisasterMapTab(
+                        messages = messages,
+                        peerNicknames = peerNicknames,
+                        onOpenChat = onOpenPrivateChat
+                    )
                     SafeRelayTab.NEARBY -> NearbyDevicesTab(
                         connectedPeers = connectedPeers,
                         peerNicknames = peerNicknames,
                         peerRSSI = viewModel.peerRSSI.collectAsState(emptyMap()).value,
                         peerDirect = viewModel.peerDirect.collectAsState(emptyMap()).value,
-                        onStartChat = { peer -> viewModel.startPrivateChat(peer); onOpenMeshChat() }
+                        onStartChat = { peer -> 
+                            val nick = peerNicknames[peer] ?: peer
+                            viewModel.startPrivateChat(peer)
+                            onOpenPrivateChat(peer, nick)
+                        },
+                        onScan = { viewModel.meshService.sendBroadcastAnnounce() }
                     )
                 }
             }
@@ -173,7 +183,15 @@ fun SafeRelayMainScreen(
     }
 
     if (showDisasterMap) {
-        DisasterMapSheet(messages = messages, onDismiss = { showDisasterMap = false })
+        DisasterMapSheet(
+            messages = messages,
+            peerNicknames = peerNicknames,
+            onOpenChat = { pid, nick ->
+                showDisasterMap = false
+                onOpenPrivateChat(pid, nick)
+            },
+            onDismiss = { showDisasterMap = false }
+        )
     }
     if (showProfile) {
         UserProfileSheet(profileManager = profileManager, onDismiss = { showProfile = false })
@@ -544,7 +562,7 @@ fun EmergencyFeedTab(messages: List<SafeRelayMessage>, viewModel: ChatViewModel)
     val listState = rememberLazyListState()
 
     val sorted = remember(messages) {
-        with(EmergencyIntelligenceEngine) { messages.sortedByEmergencyPriority() }
+        messages.sortedByDescending { it.timestamp }
     }
 
     var isHoldingSOS by remember { mutableStateOf(false) }
@@ -803,8 +821,12 @@ fun NearbyDevicesTab(
     peerNicknames: Map<String, String>,
     peerRSSI: Map<String, Int>,
     peerDirect: Map<String, Boolean>,
-    onStartChat: (String) -> Unit
+    onStartChat: (String) -> Unit,
+    onScan: () -> Unit = {}
 ) {
+    LaunchedEffect(Unit) {
+        onScan() // Initial announcement on tab open
+    }
     Column(
         modifier = Modifier.fillMaxSize().background(DarkBg)
     ) {

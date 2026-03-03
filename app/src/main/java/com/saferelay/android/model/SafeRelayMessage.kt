@@ -84,7 +84,8 @@ data class SafeRelayMessage(
     // SafeRelay emergency fields (iOS-compatible)
     val emergencyType: EmergencyMessageType = EmergencyMessageType.NORMAL,
     val priorityLevel: PriorityLevel = PriorityLevel.INFO,
-    val geoLocation: GeoLocation? = null
+    val geoLocation: GeoLocation? = null,
+    val isVerified: Boolean = true
 ) : Parcelable {
 
     /**
@@ -313,7 +314,8 @@ data class SafeRelayMessage(
                     mentions = mentions,
                     channel = channel,
                     encryptedContent = encryptedContent,
-                    isEncrypted = isEncrypted
+                    isEncrypted = isEncrypted,
+                    isVerified = true
                 )
 
             } catch (e: Exception) {

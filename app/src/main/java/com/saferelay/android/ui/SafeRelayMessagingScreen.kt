@@ -47,13 +47,24 @@ import java.util.*
 @Composable
 fun SafeRelayMessagingScreen(
     viewModel: ChatViewModel,
+    peerID: String? = null,
     peerNickname: String? = null,   // null = global mesh chat
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val myNickname = viewModel.myNickname
-    val messages by viewModel.messages.collectAsState(emptyList())
+    
+    val allMessages by viewModel.messages.collectAsState(emptyList())
+    val privateChats by viewModel.privateChats.collectAsState(emptyMap())
+    
+    val messages = remember(peerID, allMessages, privateChats) {
+        if (peerID != null) {
+            privateChats[peerID] ?: emptyList()
+        } else {
+            allMessages
+        }
+    }
 
     // Input state
     var messageText by remember { mutableStateOf("") }
@@ -151,7 +162,12 @@ fun SafeRelayMessagingScreen(
                 onTextChange = { messageText = it },
                 onSend = {
                     if (messageText.isNotBlank()) {
-                        viewModel.sendMessage(messageText)
+                        if (peerID != null) {
+                            // Send private message via viewModel
+                            viewModel.sendMessage(messageText) // ViewModel handles active peer
+                        } else {
+                            viewModel.sendMessage(messageText)
+                        }
                         messageText = ""
                     }
                 },

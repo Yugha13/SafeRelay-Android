@@ -301,20 +301,36 @@ class MainActivity : OrientationAwareActivity() {
 
                 // Navigation: MAIN -> MESSAGING -> ADVANCED_CHAT
                 var screen by remember { mutableStateOf("main") }
+                var selectedPeer by remember { mutableStateOf<String?>(null) }
+                var selectedPeerNick by remember { mutableStateOf<String?>(null) }
 
                 when (screen) {
                     "messaging" ->
                         com.saferelay.android.ui.SafeRelayMessagingScreen(
                             viewModel = chatViewModel,
-                            peerNickname = null,
-                            onBack = { screen = "main" }
+                            peerID = selectedPeer,
+                            peerNickname = selectedPeerNick,
+                            onBack = { 
+                                screen = "main"
+                                selectedPeer = null
+                                selectedPeerNick = null
+                            }
                         )
                     "advanced" ->
                         ChatScreen(viewModel = chatViewModel)
                     else ->
                         com.saferelay.android.ui.SafeRelayMainScreen(
                             viewModel = chatViewModel,
-                            onOpenMeshChat = { screen = "messaging" },
+                            onOpenMeshChat = { 
+                                screen = "messaging"
+                                selectedPeer = null
+                                selectedPeerNick = null
+                            },
+                            onOpenPrivateChat = { peerId, nick ->
+                                selectedPeer = peerId
+                                selectedPeerNick = nick
+                                screen = "messaging"
+                            },
                             onOpenProfile = {}
                         )
                 }

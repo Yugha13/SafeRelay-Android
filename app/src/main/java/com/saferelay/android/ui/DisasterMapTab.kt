@@ -36,7 +36,11 @@ import com.saferelay.android.model.PriorityLevel
 // Disaster Map Tab (embedded in main screen)
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
-fun DisasterMapTab(messages: List<SafeRelayMessage>) {
+fun DisasterMapTab(
+    messages: List<SafeRelayMessage>,
+    peerNicknames: Map<String, String> = emptyMap(),
+    onOpenChat: (String, String) -> Unit = { _, _ -> }
+) {
     val context = LocalContext.current
     val sosMessages = remember(messages) {
         messages.filter {
@@ -55,7 +59,11 @@ fun DisasterMapTab(messages: List<SafeRelayMessage>) {
                 sosMessages = sosMessages,
                 modifier = Modifier.fillMaxSize(),
                 onError = { mapError = true },
-                onLoaded = { isLoading = false }
+                onLoaded = { isLoading = false },
+                onMarkerClick = { pid ->
+                    val nick = peerNicknames[pid] ?: pid
+                    onOpenChat(pid, nick)
+                }
             )
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize().background(Color(0xFF050505)),
@@ -166,7 +174,12 @@ private fun OfflineMapFallback(sosMessages: List<SafeRelayMessage>) {
 // Disaster Map Sheet (full-screen from header button)
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
-fun DisasterMapSheet(messages: List<SafeRelayMessage>, onDismiss: () -> Unit) {
+fun DisasterMapSheet(
+    messages: List<SafeRelayMessage>,
+    peerNicknames: Map<String, String> = emptyMap(),
+    onOpenChat: (String, String) -> Unit = { _, _ -> },
+    onDismiss: () -> Unit
+) {
     val sosMessages = remember(messages) {
         messages.filter { it.emergencyType == EmergencyMessageType.SOS || it.priorityLevel == PriorityLevel.CRITICAL }
     }
@@ -182,7 +195,11 @@ fun DisasterMapSheet(messages: List<SafeRelayMessage>, onDismiss: () -> Unit) {
                     sosMessages = sosMessages,
                     modifier = Modifier.fillMaxSize(),
                     onError = { mapError = true },
-                    onLoaded = {}
+                    onLoaded = {},
+                    onMarkerClick = { pid ->
+                        val nick = peerNicknames[pid] ?: pid
+                        onOpenChat(pid, nick)
+                    }
                 )
             }
 
@@ -242,12 +259,26 @@ fun LeafletMapView(
     sosMessages: List<SafeRelayMessage>,
     modifier: Modifier = Modifier,
     onError: () -> Unit,
-    onLoaded: () -> Unit
+    onLoaded: () -> Unit,
+    onMarkerClick: (String) -> Unit = {}
 ) {
     val html = buildLeafletHtml(sosMessages)
+    val context = LocalContext.current
+
+    // JS Interface for marker clicks
+    val jsInterface = remember {
+        object {
+            @android.webkit.JavascriptInterface
+            fun onMarkerTap(peerId: String) {
+                onMarkerClick(peerId)
+            }
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
+                addJavascriptInterface(jsInterface, "Android")
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
@@ -286,9 +317,13 @@ private fun buildLeafletHtml(sosMessages: List<SafeRelayMessage>): String {
             val lon = msg.geoLocation?.longitude ?: (78.96 + (i % 5) * 0.8)
             val title = "${msg.emergencyType.emoji} @${msg.sender}".replace("'", "\\'")
             val body = msg.content.take(100).replace("'", "\\'").replace("\n", " ")
+            val pid = msg.senderPeerID ?: msg.sender
             append("""
                 L.marker([$lat,$lon],{icon:si})
                   .addTo(map)
+                  .on('click', function(e) {
+                      Android.onMarkerTap('$pid');
+                  })
                   .bindPopup('<b>$title</b><p style="margin:4px 0">$body</p>');
             """.trimIndent())
             append("\n")

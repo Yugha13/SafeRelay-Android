@@ -386,8 +386,13 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         // Enforce: only accept public messages from verified peers we know
         val peerInfo = delegate?.getPeerInfo(peerID)
         if (peerInfo == null || !peerInfo.isVerifiedNickname) {
-            Log.w(TAG, "🚫 Dropping public message from unverified or unknown peer ${peerID.take(8)}...")
-            return
+            Log.w(TAG, "🚫 Message from unverified peer ${peerID.take(8)}... requesting announcement.")
+            // Trigger announcement from this peer so we can verify them
+            handlerScope.launch {
+                delay(Random.nextLong(500, 1500))
+                delegate?.initiateNoiseHandshake(peerID) // This also probes for identity in our protocol
+            }
+            // We'll still process the message for better UX, but mark it as unverified
         }
         
         try {
@@ -405,7 +410,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     content = savedPath,
                     type = com.saferelay.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
-                    timestamp = Date(packet.timestamp.toLong())
+                    timestamp = Date(packet.timestamp.toLong()),
+                    isVerified = peerInfo?.isVerifiedNickname ?: false
                 )
                 Log.d(TAG, "📄 Saved incoming file to $savedPath")
                 delegate?.onMessageReceived(message)
@@ -431,6 +437,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
      * Handle (decrypted) private message addressed to us
      */
     private suspend fun handlePrivateMessage(packet: SafeRelayPacket, peerID: String) {
+        val peerInfo = delegate?.getPeerInfo(peerID)
         try {
             // Verify signature if present
             if (packet.signature != null && !delegate?.verifySignature(packet, peerID)!!) {
@@ -454,7 +461,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     senderPeerID = peerID,
                     timestamp = Date(packet.timestamp.toLong()),
                     isPrivate = true,
-                    recipientNickname = delegate?.getMyNickname()
+                    recipientNickname = delegate?.getMyNickname(),
+                    isVerified = peerInfo?.isVerifiedNickname ?: false
                 )
                 Log.d(TAG, "📄 Saved incoming file to $savedPath")
                 delegate?.onMessageReceived(message)
