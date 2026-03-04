@@ -120,7 +120,7 @@ fun SafeRelayMainScreen(
             // ── Body ───────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
-                    SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile)
+                    SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { showProfile = true })
                     SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel, embedded = true)
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
@@ -279,7 +279,7 @@ private fun SafeRelayHeader(
 // STATUS TAB – home screen with "I'm Safe" / SOS broadcast
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
-fun StatusTab(viewModel: ChatViewModel, profile: UserProfile) {
+fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: () -> Unit = {}) {
     val context = LocalContext.current
     var lastAction by remember { mutableStateOf<String?>(null) }
     var lastActionTime by remember { mutableStateOf(0L) }
@@ -325,7 +325,7 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile) {
 
         // Profile greeting card
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().clickable { onProfileClick() },
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F0F)),
             border = BorderStroke(0.5.dp, SOSRed.copy(alpha = 0.25f))
