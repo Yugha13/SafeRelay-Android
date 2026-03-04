@@ -58,7 +58,7 @@ val MeshBlue   = Color(0xFF3A8FFF)
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     STATUS("Home", Icons.Filled.Home),
-    FEED("Feed", Icons.Filled.DynamicFeed),
+    CHAT("Chat", Icons.Filled.Chat),
     MAP("Map", Icons.Filled.Map),
     NEARBY("Nearby", Icons.Filled.Wifi),
 }
@@ -118,7 +118,7 @@ fun SafeRelayMainScreen(
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
                     SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile)
-                    SafeRelayTab.FEED   -> EmergencyFeedTab(messages = messages, viewModel = viewModel)
+                    SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel)
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         peerNicknames = peerNicknames,
