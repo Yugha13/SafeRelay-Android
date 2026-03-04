@@ -244,23 +244,64 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
             )
         }
 
-        // Floating header - positioned absolutely at top, ignores keyboard
-        ChatFloatingHeader(
-            headerHeight = headerHeight,
-            embedded = embedded,
-            selectedPrivatePeer = null,
-            currentChannel = currentChannel,
-            nickname = nickname,
-            viewModel = viewModel,
-            colorScheme = colorScheme,
-            onSidebarToggle = { viewModel.showMeshPeerList() },
-            onShowAppInfo = { viewModel.showAppInfo() },
-            onPanicClear = { viewModel.panicClearAllData() },
-            onLocationChannelsClick = { showLocationChannelsSheet = true },
-            onLocationNotesClick = { showLocationNotesSheet = true }
-        )
+        // Floating header
+        if (embedded) {
+            // Simplified broadcast header for embedded chat
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(1f),
+                color = colorScheme.background
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(headerHeight)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "SafeRelay/",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colorScheme.primary,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "@$nickname",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "👥 ${connectedPeers.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        } else {
+            ChatFloatingHeader(
+                headerHeight = headerHeight,
+                embedded = false,
+                selectedPrivatePeer = null,
+                currentChannel = currentChannel,
+                nickname = nickname,
+                viewModel = viewModel,
+                colorScheme = colorScheme,
+                onSidebarToggle = { viewModel.showMeshPeerList() },
+                onShowAppInfo = { viewModel.showAppInfo() },
+                onPanicClear = { viewModel.panicClearAllData() },
+                onLocationChannelsClick = { showLocationChannelsSheet = true },
+                onLocationNotesClick = { showLocationNotesSheet = true }
+            )
+        }
 
-        // Divider under header - positioned after status bar + header height
+        // Divider under header
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()

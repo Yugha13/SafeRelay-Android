@@ -86,6 +86,13 @@ fun SafeRelayMainScreen(
     var showProfile by remember { mutableStateOf(false) }
     var showIncomingSosAlert by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
+    // Sync profile name → chat nickname
+    LaunchedEffect(profile.fullName) {
+        if (profile.fullName.isNotBlank()) {
+            viewModel.setNickname(profile.fullName)
+        }
+    }
+
     // Watch for incoming SOS
     LaunchedEffect(messages) {
         val latestSos = messages.lastOrNull { it.isSosAlert() && it.sender != viewModel.myNickname }
