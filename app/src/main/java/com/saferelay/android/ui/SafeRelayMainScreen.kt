@@ -80,6 +80,8 @@ fun SafeRelayMainScreen(
     val peerNicknames by viewModel.peerNicknames.collectAsState(emptyMap())
 
     var selectedTab by remember { mutableStateOf(SafeRelayTab.STATUS) }
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
     var showDisasterMap by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     var showIncomingSosAlert by remember { mutableStateOf<SafeRelayMessage?>(null) }
@@ -103,22 +105,23 @@ fun SafeRelayMainScreen(
                 .fillMaxSize()
                 .statusBarsPadding()   // ← fixes top spacing gap
         ) {
-            // ── Header ─────────────────────────────────────────────────
-            SafeRelayHeader(
-                profile = profile,
-                connectedPeerCount = connectedPeers.size,
-                onMapClick = { showDisasterMap = true },
-                onProfileClick = { showProfile = true },
-                onBrandClick = onOpenMeshChat
-            )
-
-            HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
+            // ── Header (hidden when Chat tab is active) ────────────────
+            if (selectedTab != SafeRelayTab.CHAT) {
+                SafeRelayHeader(
+                    profile = profile,
+                    connectedPeerCount = connectedPeers.size,
+                    onMapClick = { showDisasterMap = true },
+                    onProfileClick = { showProfile = true },
+                    onBrandClick = onOpenMeshChat
+                )
+                HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
+            }
 
             // ── Body ───────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
                     SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile)
-                    SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel)
+                    SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel, embedded = true)
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         peerNicknames = peerNicknames,
@@ -139,39 +142,41 @@ fun SafeRelayMainScreen(
                 }
             }
 
-            HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
+            // ── Bottom Navigation (hidden when keyboard up in Chat) ──
+            if (!(selectedTab == SafeRelayTab.CHAT && imeVisible)) {
+                HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
 
-            // ── Bottom Navigation ──────────────────────────────────────
-            NavigationBar(
-                containerColor = Color(0xFF0A0A0A),
-                tonalElevation = 0.dp,
-                modifier = Modifier.navigationBarsPadding()
-            ) {
-                SafeRelayTab.values().forEach { tab ->
-                    val selected = selectedTab == tab
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { selectedTab = tab },
-                        icon = {
-                            Icon(
-                                tab.icon,
-                                contentDescription = tab.label,
-                                tint = if (selected) SOSRed else Color(0xFF555555),
-                                modifier = Modifier.size(22.dp)
+                NavigationBar(
+                    containerColor = Color(0xFF0A0A0A),
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.navigationBarsPadding()
+                ) {
+                    SafeRelayTab.values().forEach { tab ->
+                        val selected = selectedTab == tab
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = { selectedTab = tab },
+                            icon = {
+                                Icon(
+                                    tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = if (selected) SOSRed else Color(0xFF555555),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    tab.label,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (selected) SOSRed else Color(0xFF555555)
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = SOSRed.copy(alpha = 0.15f)
                             )
-                        },
-                        label = {
-                            Text(
-                                tab.label,
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = if (selected) SOSRed else Color(0xFF555555)
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = SOSRed.copy(alpha = 0.15f)
                         )
-                    )
+                    }
                 }
             }
         }

@@ -38,7 +38,7 @@ import com.saferelay.android.ui.media.FullScreenImageViewer
  * - ChatUIUtils: Utility functions for formatting and colors
  */
 @Composable
-fun ChatScreen(viewModel: ChatViewModel) {
+fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
     val colorScheme = MaterialTheme.colorScheme
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val connectedPeers by viewModel.connectedPeers.collectAsStateWithLifecycle()
@@ -119,15 +119,19 @@ fun ChatScreen(viewModel: ChatViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.ime) // This handles keyboard insets
-                .windowInsetsPadding(WindowInsets.navigationBars) // Add bottom padding when keyboard is not expanded
+                .windowInsetsPadding(WindowInsets.ime)
+                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier)
         ) {
             // Header spacer - creates exact space for the floating header (status bar + compact header)
-            Spacer(
-                modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .height(headerHeight)
-            )
+            if (!embedded) {
+                Spacer(
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .height(headerHeight)
+                )
+            } else {
+                Spacer(modifier = Modifier.height(headerHeight))
+            }
 
             // Messages area - takes up available space, will compress when keyboard appears
             MessagesList(
@@ -243,6 +247,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         // Floating header - positioned absolutely at top, ignores keyboard
         ChatFloatingHeader(
             headerHeight = headerHeight,
+            embedded = embedded,
             selectedPrivatePeer = null,
             currentChannel = currentChannel,
             nickname = nickname,
@@ -259,7 +264,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
+                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
                 .offset(y = headerHeight)
                 .zIndex(1f),
             color = colorScheme.outline.copy(alpha = 0.3f)
@@ -274,7 +279,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 64.dp)
                 .zIndex(1.5f)
-                .windowInsetsPadding(WindowInsets.navigationBars)
+                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier)
                 .windowInsetsPadding(WindowInsets.ime)
         ) {
             Surface(
@@ -410,6 +415,7 @@ fun ChatInputSection(
 @Composable
 private fun ChatFloatingHeader(
     headerHeight: Dp,
+    embedded: Boolean = false,
     selectedPrivatePeer: String?,
     currentChannel: String?,
     nickname: String,
@@ -428,7 +434,7 @@ private fun ChatFloatingHeader(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(1f)
-            .windowInsetsPadding(WindowInsets.statusBars), // Extend into status bar area
+            .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier),
         color = colorScheme.background // Solid background color extending into status bar
     ) {
         TopAppBar(
