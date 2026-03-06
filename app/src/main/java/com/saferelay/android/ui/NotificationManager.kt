@@ -7,9 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.AdaptiveIconDrawable
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.saferelay.android.MainActivity
 import com.saferelay.android.R
 import com.saferelay.android.util.NotificationIntervalManager
@@ -88,6 +92,34 @@ class NotificationManager(
 
     init {
         createNotificationChannel()
+    }
+    
+    /**
+     * Helper to get a circular version of the app logo for notifications
+     */
+    private fun getCircularLogo(): Bitmap? {
+        val drawable = ContextCompat.getDrawable(context, R.mipmap.ic_launcher) ?: return null
+        val size = 120 // Standard size for notification large icon
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        
+        // Draw drawable to bitmap
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        
+        // Create circular output
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val outputCanvas = Canvas(output)
+        val paint = Paint()
+        val rect = Rect(0, 0, size, size)
+        
+        paint.isAntiAlias = true
+        outputCanvas.drawARGB(0, 0, 0, 0)
+        outputCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        outputCanvas.drawBitmap(bitmap, rect, rect, paint)
+        
+        return output
     }
 
     private fun createNotificationChannel() {
@@ -232,6 +264,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
@@ -299,6 +332,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(title)
             .setContentText(body)
             .setContentIntent(pendingIntent)
@@ -334,6 +368,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
           .setSmallIcon(R.drawable.ic_notification)
+          .setLargeIcon(getCircularLogo())
           .setContentTitle(contentTitle)
           .setContentText(contentText)
           .setContentIntent(pendingIntent)
@@ -365,6 +400,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(context.getString(R.string.notification_messages_from_people, totalMessages, senderCount))
             .setContentIntent(pendingIntent)
@@ -507,6 +543,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, GEOHASH_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
@@ -587,6 +624,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, GEOHASH_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
@@ -720,6 +758,7 @@ class NotificationManager(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(getCircularLogo())
             .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)

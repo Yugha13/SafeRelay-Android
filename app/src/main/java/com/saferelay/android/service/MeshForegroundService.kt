@@ -297,10 +297,31 @@ class MeshForegroundService : Service() {
         val title = getString(R.string.app_name)
         val content = getString(R.string.mesh_service_notification_content, activePeers)
 
+        // Create circular logo
+        val drawable = androidx.core.content.ContextCompat.getDrawable(this, R.mipmap.ic_launcher)
+        val largeIcon = drawable?.let {
+            val size = 120
+            val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            it.setBounds(0, 0, canvas.width, canvas.height)
+            it.draw(canvas)
+            
+            val output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val outputCanvas = android.graphics.Canvas(output)
+            val paint = android.graphics.Paint()
+            val rect = android.graphics.Rect(0, 0, size, size)
+            paint.isAntiAlias = true
+            outputCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+            outputCanvas.drawBitmap(bitmap, rect, rect, paint)
+            output
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
