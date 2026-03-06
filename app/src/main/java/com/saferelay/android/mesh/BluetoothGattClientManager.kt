@@ -416,7 +416,24 @@ class BluetoothGattClientManager(
                     // Request a larger MTU. Must be done before any data transfer.
                     connectionScope.launch {
                         delay(200) // A small delay can improve reliability of MTU request.
-                        gatt.requestMtu(517)
+                        var mtuRequested = false
+                        try {
+                            mtuRequested = gatt.requestMtu(517)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Exception requesting MTU: ${e.message}")
+                        }
+                        
+                        if (!mtuRequested) {
+                            Log.w(TAG, "requestMtu returned false, proceeding to discoverServices")
+                            gatt.discoverServices()
+                        } else {
+                            // Fallback timeout in case onMtuChanged is never called (common Samsung/Android bug)
+                            delay(2000)
+                            if (gatt.services.isEmpty()) {
+                                Log.w(TAG, "MTU callback timeout, forcing discoverServices")
+                                gatt.discoverServices()
+                            }
+                        }
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -475,6 +492,7 @@ class BluetoothGattClientManager(
                     if (service != null) {
                         val characteristic = service.getCharacteristic(AppConstants.Mesh.Gatt.CHARACTERISTIC_UUID)
                         if (characteristic != null) {
+                            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                             connectionTracker.getDeviceConnection(deviceAddress)?.let { deviceConn ->
                                 val updatedConn = deviceConn.copy(characteristic = characteristic)
                                 connectionTracker.updateDeviceConnection(deviceAddress, updatedConn)

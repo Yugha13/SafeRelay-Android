@@ -268,6 +268,14 @@ class BluetoothGattServerManager(
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
                 }
             }
+            
+            override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+                // Guard against callbacks after service shutdown
+                if (!isActive) {
+                    return
+                }
+                Log.i(TAG, "Server: MTU changed for ${device.address} to $mtu")
+            }
         }
         
         // Proper cleanup sequencing to prevent race conditions
