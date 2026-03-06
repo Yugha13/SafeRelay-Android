@@ -1,5 +1,6 @@
 package com.saferelay.android.ui
 
+import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -44,7 +45,8 @@ fun DisasterMapTab(
     val context = LocalContext.current
     val sosMessages = remember(messages) {
         messages.filter {
-            it.emergencyType == EmergencyMessageType.SOS || it.priorityLevel == PriorityLevel.CRITICAL
+            (it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
+            it.priorityLevel == PriorityLevel.CRITICAL
         }
     }
     var mapError by remember { mutableStateOf(false) }
@@ -252,7 +254,7 @@ fun DisasterMapSheet(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Leaflet WebView – with error detection
+// Leaflet WebView – with local asset loading and error detection
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
 fun LeafletMapView(
@@ -265,11 +267,18 @@ fun LeafletMapView(
     val html = buildLeafletHtml(sosMessages)
     val context = LocalContext.current
 
-    // JS Interface for marker clicks
+    // JS Interface for marker clicks and "Send Message" button
     val jsInterface = remember {
         object {
             @android.webkit.JavascriptInterface
             fun onMarkerTap(peerId: String) {
+                // Main marker click (can show popup or handle direct action)
+                onMarkerClick(peerId)
+            }
+
+            @android.webkit.JavascriptInterface
+            fun sendMessage(peerId: String) {
+                // Specific "Send Message" button click inside popup
                 onMarkerClick(peerId)
             }
         }
@@ -282,6 +291,7 @@ fun LeafletMapView(
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
+                    allowFileAccess = true
                     setSupportZoom(true)
                     builtInZoomControls = true
                     displayZoomControls = false
@@ -296,14 +306,19 @@ fun LeafletMapView(
                         request: WebResourceRequest?,
                         error: WebResourceError?
                     ) {
-                        if (request?.isForMainFrame == true) onError()
+                        // Leaflet might fail to load tiles offline, but we want the UI code to run.
+                        // Only trigger error if main frame fails significantly.
+                        if (request?.isForMainFrame == true) {
+                            Log.e("LeafletMapView", "WebView Error: ${error?.description}")
+                        }
                     }
                 }
-                loadDataWithBaseURL("https://openstreetmap.org", html, "text/html", "UTF-8", null)
+                // Base URL pointing to assets allows relative file loading for tiles/scripts if needed
+                loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
             }
         },
         update = { wv ->
-            wv.loadDataWithBaseURL("https://openstreetmap.org", html, "text/html", "UTF-8", null)
+            wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
         },
         modifier = modifier
     )
@@ -312,28 +327,48 @@ fun LeafletMapView(
 private fun buildLeafletHtml(sosMessages: List<SafeRelayMessage>): String {
     val markersJs = buildString {
         sosMessages.forEachIndexed { i, msg ->
-            // Use real GPS if available, scatter across India if not
-            val lat = msg.geoLocation?.latitude ?: (20.59 + (i % 5) * 0.8)
-            val lon = msg.geoLocation?.longitude ?: (78.96 + (i % 5) * 0.8)
+            // Use real GPS if available, scatter across a default region if not (e.g. India center)
+            val lat = msg.geoLocation?.latitude ?: (20.5 + (i % 10) * 0.05)
+            val lon = msg.geoLocation?.longitude ?: (78.9 + (i % 10) * 0.05)
             val title = "${msg.emergencyType.emoji} @${msg.sender}".replace("'", "\\'")
-            val body = msg.content.take(100).replace("'", "\\'").replace("\n", " ")
+            val body = msg.content.take(120).replace("'", "\\'").replace("\n", " ")
             val pid = msg.senderPeerID ?: msg.sender
+            
+            // Generate distinct colors for different types
+            val glowColor = when(msg.emergencyType) {
+                EmergencyMessageType.SOS -> "#FF0000"
+                EmergencyMessageType.MEDICAL_REQUEST -> "#FF4444"
+                EmergencyMessageType.RESOURCE_UPDATE -> "#44FF44"
+                else -> "#FFCC00"
+            }
+
             append("""
-                L.marker([$lat,$lon],{icon:si})
+                var icon$i = L.divIcon({
+                  html:'<div style="font-size:28px;filter:drop-shadow(0 0 8px $glowColor);">${msg.emergencyType.emoji}</div>',
+                  iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-18],className:''
+                });
+
+                L.marker([$lat,$lon],{icon:icon$i})
                   .addTo(map)
-                  .on('click', function(e) {
-                      Android.onMarkerTap('$pid');
-                  })
-                  .bindPopup('<b>$title</b><p style="margin:4px 0">$body</p>');
+                  .bindPopup(`
+                    <div style="color:#eee;font-family:monospace;min-width:160px;">
+                        <b style="color:#ff4444;font-size:14px;">$title</b>
+                        <p style="margin:8px 0;font-size:12px;color:#ccc;">$body</p>
+                        <button onclick="Android.sendMessage('$pid')" 
+                                style="width:100%;padding:8px;background:#CC0000;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-family:monospace;">
+                            SEND MESSAGE
+                        </button>
+                    </div>
+                  `, {maxWidth: 240, className: 'sr-popup'});
             """.trimIndent())
             append("\n")
         }
     }
 
-    // Default center: India
+    // Default center: India or first message location
     val centerLat = sosMessages.firstOrNull()?.geoLocation?.latitude ?: 20.5937
     val centerLon = sosMessages.firstOrNull()?.geoLocation?.longitude ?: 78.9629
-    val zoom = if (sosMessages.any { it.geoLocation != null }) 8 else 5
+    val zoom = if (sosMessages.any { it.geoLocation != null }) 9 else 5
 
     return """
 <!DOCTYPE html>
@@ -341,29 +376,32 @@ private fun buildLeafletHtml(sosMessages: List<SafeRelayMessage>): String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
+<link rel="stylesheet" href="leaflet/leaflet.css" />
+<script src="leaflet/leaflet.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body,#map{height:100%;width:100%;background:#000}
+  html,body,#map{height:100%;width:100%;background:#050505}
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: #151515 !important;
+    border: 1px solid #330000;
+  }
+  .leaflet-popup-content { margin: 12px; }
+  .sr-popup .leaflet-popup-close-button { color: #888 !important; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script>
-var map = L.map('map',{center:[$centerLat,$centerLon],zoom:$zoom,zoomControl:true});
+var map = L.map('map',{center:[$centerLat,$centerLon],zoom:$zoom,zoomControl:false});
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap',
+  attribution:'© OSM',
   maxZoom:19,
   subdomains:['a','b','c']
 }).addTo(map);
 
-var si = L.divIcon({
-  html:'<div style="font-size:26px;filter:drop-shadow(0 0 6px red);line-height:1">🆘</div>',
-  iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-18],className:''
-});
+// Add zoom control at bottom right
+L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 $markersJs
 </script>
