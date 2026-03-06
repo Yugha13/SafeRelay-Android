@@ -14,18 +14,8 @@ object MessagePadding {
      * Find optimal block size for data - exact same logic as iOS
      */
     fun optimalBlockSize(dataSize: Int): Int {
-        // Account for encryption overhead (~16 bytes for AES-GCM tag)
-        val totalSize = dataSize + 16
-        
-        // Find smallest block that fits
-        for (blockSize in blockSizes) {
-            if (totalSize <= blockSize) {
-                return blockSize
-            }
-        }
-        
-        // For very large messages, just use the original size
-        // (will be fragmented anyway)
+        // Disabled artificial padding for Android BLE compatibility
+        // (will be properly fragmented if truly too large)
         return dataSize
     }
     
