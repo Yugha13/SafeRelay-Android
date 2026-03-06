@@ -704,13 +704,24 @@ class BluetoothMeshService(private val context: Context) {
         if (content.isEmpty()) return
         
         serviceScope.launch {
+            val message = SafeRelayMessage(
+                sender = delegate?.getNickname() ?: myPeerID,
+                content = content,
+                timestamp = Date(),
+                mentions = mentions,
+                channel = channel,
+                senderPeerID = myPeerID
+            )
+            
+            val payload = message.toBinaryPayload() ?: content.toByteArray(Charsets.UTF_8)
+
             val packet = SafeRelayPacket(
                 version = 1u,
                 type = MessageType.MESSAGE.value,
                 senderID = hexStringToByteArray(myPeerID),
                 recipientID = SpecialRecipients.BROADCAST,
                 timestamp = System.currentTimeMillis().toULong(),
-                payload = content.toByteArray(Charsets.UTF_8),
+                payload = payload,
                 signature = null,
                 ttl = MAX_TTL
             )

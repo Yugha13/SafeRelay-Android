@@ -311,10 +311,16 @@ class MeshDelegateHandler(
     // registerPeerPublicKey REMOVED - fingerprints now handled centrally in PeerManager
 
     /**
+     * Send public mesh message
+     */
+    fun sendMessage(content: String, mentions: List<String> = emptyList(), channel: String? = null) {
+        getMeshService().sendMessage(content, mentions, channel)
+    }
+
+    /**
      * Expose mesh peer info for components that need to resolve identities (e.g., Nostr mapping)
      */
     fun getPeerInfo(peerID: String): com.saferelay.android.mesh.PeerInfo? {
         return getMeshService().getPeerInfo(peerID)
     }
-
 }

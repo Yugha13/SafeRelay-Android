@@ -420,12 +420,17 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                 Log.w(TAG, "⚠️ FILE_TRANSFER decode failed (broadcast) from ${peerID.take(8)} payloadSize=${packet.payload.size}")
             }
 
+            // NEW: Try decoding as structured SafeRelayMessage (for channel support)
             // Fallback: plain text
-            val message = SafeRelayMessage(
+            val message = SafeRelayMessage.fromBinaryPayload(packet.payload)?.copy(
+                senderPeerID = peerID,
+                isVerified = peerInfo?.isVerifiedNickname ?: false
+            ) ?: SafeRelayMessage(
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
-                timestamp = Date(packet.timestamp.toLong())
+                timestamp = Date(packet.timestamp.toLong()),
+                isVerified = peerInfo?.isVerifiedNickname ?: false
             )
             delegate?.onMessageReceived(message)
         } catch (e: Exception) {

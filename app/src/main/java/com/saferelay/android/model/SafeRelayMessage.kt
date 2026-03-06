@@ -90,18 +90,32 @@ data class SafeRelayMessage(
 
     /**
      * Convert message to binary payload format - exactly same as iOS version
+     * Supports v2 with emergency metadata
      */
     fun toBinaryPayload(): ByteArray? {
         try {
-            val buffer = ByteBuffer.allocate(4096).apply { order(ByteOrder.BIG_ENDIAN) }
+            val buffer = ByteBuffer.allocate(8192).apply { order(ByteOrder.BIG_ENDIAN) }
 
-            // Message format:
-            // - Flags: 1 byte (bit flags for optional fields)
-            // - Timestamp: 8 bytes (milliseconds since epoch, big-endian)
-            // - ID length: 1 byte + ID data
-            // - Sender length: 1 byte + sender data
-            // - Content length: 2 bytes + content data (or encrypted content)
-            // Optional fields based on flags...
+            // Message format v1:
+            // - Flags: 1 byte
+            // - Timestamp: 8 bytes
+            // - ID: 1 byte length + data
+            // - Sender: 1 byte length + data
+            // - Content: 2 bytes length + data
+            // - Optional: originalSender, recipientNickname, senderPeerID, mentions, channel
+            
+            // Message format v2 adds:
+            // - Version: 1 byte (0x02) - inserted at the beginning or as a flag?
+            // iOS implementation typically uses a version byte at the very start for breaking changes.
+            // Let's use 0x02 as the first byte for v2, or keep it v1 if no extra fields.
+            
+            val isV2 = emergencyType != EmergencyMessageType.NORMAL || 
+                       priorityLevel != PriorityLevel.INFO || 
+                       geoLocation != null
+
+            if (isV2) {
+                buffer.put(0x02.toByte()) // Version prefix for v2
+            }
 
             var flags: UByte = 0u
             if (isRelay) flags = flags or 0x01u
@@ -115,9 +129,8 @@ data class SafeRelayMessage(
 
             buffer.put(flags.toByte())
 
-            // Timestamp (in milliseconds, 8 bytes big-endian)
-            val timestampMillis = timestamp.time
-            buffer.putLong(timestampMillis)
+            // Timestamp (8 bytes)
+            buffer.putLong(timestamp.time)
 
             // ID
             val idBytes = id.toByteArray(Charsets.UTF_8)
@@ -129,7 +142,7 @@ data class SafeRelayMessage(
             buffer.put(minOf(senderBytes.size, 255).toByte())
             buffer.put(senderBytes.take(255).toByteArray())
 
-            // Content or encrypted content
+            // Content
             if (isEncrypted && encryptedContent != null) {
                 val length = minOf(encryptedContent.size, 65535)
                 buffer.putShort(length.toShort())
@@ -141,47 +154,48 @@ data class SafeRelayMessage(
                 buffer.put(contentBytes.take(length).toByteArray())
             }
 
-            // Optional fields
-            originalSender?.let { origSender ->
-                val origBytes = origSender.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(origBytes.size, 255).toByte())
-                buffer.put(origBytes.take(255).toByteArray())
+            // Optional fields (v1)
+            originalSender?.let { s -> 
+                val b = s.toByteArray(); buffer.put(minOf(b.size, 255).toByte()); buffer.put(b.take(255).toByteArray()) 
             }
-
-            recipientNickname?.let { recipient ->
-                val recipBytes = recipient.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(recipBytes.size, 255).toByte())
-                buffer.put(recipBytes.take(255).toByteArray())
+            recipientNickname?.let { s -> 
+                val b = s.toByteArray(); buffer.put(minOf(b.size, 255).toByte()); buffer.put(b.take(255).toByteArray()) 
             }
-
-            senderPeerID?.let { peerID ->
-                val peerBytes = peerID.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(peerBytes.size, 255).toByte())
-                buffer.put(peerBytes.take(255).toByteArray())
+            senderPeerID?.let { s -> 
+                val b = s.toByteArray(); buffer.put(minOf(b.size, 255).toByte()); buffer.put(b.take(255).toByteArray()) 
             }
-
-            // Mentions array
-            mentions?.let { mentionList ->
-                buffer.put(minOf(mentionList.size, 255).toByte())
-                mentionList.take(255).forEach { mention ->
-                    val mentionBytes = mention.toByteArray(Charsets.UTF_8)
-                    buffer.put(minOf(mentionBytes.size, 255).toByte())
-                    buffer.put(mentionBytes.take(255).toByteArray())
+            
+            mentions?.let { list ->
+                buffer.put(minOf(list.size, 255).toByte())
+                list.take(255).forEach { m ->
+                    val b = m.toByteArray(); buffer.put(minOf(b.size, 255).toByte()); buffer.put(b.take(255).toByteArray())
                 }
             }
+            
+            channel?.let { s -> 
+                val b = s.toByteArray(); buffer.put(minOf(b.size, 255).toByte()); buffer.put(b.take(255).toByteArray()) 
+            }
 
-            // Channel hashtag
-            channel?.let { channelName ->
-                val channelBytes = channelName.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(channelBytes.size, 255).toByte())
-                buffer.put(channelBytes.take(255).toByteArray())
+            // v2 specific fields
+            if (isV2) {
+                // Emergency Type (1 byte)
+                buffer.put(emergencyType.rawValue.toByte())
+                // Priority Level (1 byte)
+                buffer.put(priorityLevel.rawValue.toByte())
+                // GeoLocation (2 * 8 bytes)
+                if (geoLocation != null) {
+                    buffer.put(0x01.toByte()) // Has Location flag
+                    buffer.putDouble(geoLocation.latitude)
+                    buffer.putDouble(geoLocation.longitude)
+                } else {
+                    buffer.put(0x00.toByte()) // No Location flag
+                }
             }
 
             val result = ByteArray(buffer.position())
             buffer.rewind()
             buffer.get(result)
             return result
-
         } catch (e: Exception) {
             return null
         }
@@ -193,9 +207,19 @@ data class SafeRelayMessage(
          */
         fun fromBinaryPayload(data: ByteArray): SafeRelayMessage? {
             try {
-                if (data.size < 13) return null
+                if (data.size < 1) return null
 
                 val buffer = ByteBuffer.wrap(data).apply { order(ByteOrder.BIG_ENDIAN) }
+                
+                // Detect version
+                var version = 1
+                buffer.mark()
+                val firstByte = buffer.get().toInt() and 0xFF
+                if (firstByte == 0x02) {
+                    version = 2
+                } else {
+                    buffer.reset() // It's v1, first byte is flags
+                }
 
                 // Flags
                 val flags = buffer.get().toUByte()
@@ -245,7 +269,7 @@ data class SafeRelayMessage(
                     encryptedContent = null
                 }
 
-                // Optional fields
+                // Optional fields (v1)
                 val originalSender = if (hasOriginalSender && buffer.hasRemaining()) {
                     val length = buffer.get().toInt() and 0xFF
                     if (buffer.remaining() >= length) {
@@ -300,6 +324,24 @@ data class SafeRelayMessage(
                     } else null
                 } else null
 
+                // v2 Fields
+                var emergencyType = EmergencyMessageType.NORMAL
+                var priorityLevel = PriorityLevel.INFO
+                var geoLocation: GeoLocation? = null
+
+                if (version == 2 && buffer.hasRemaining()) {
+                    emergencyType = EmergencyMessageType.fromRawValue(buffer.get().toUByte())
+                    priorityLevel = PriorityLevel.fromRawValue(buffer.get().toUByte())
+                    
+                    if (buffer.hasRemaining() && buffer.get().toInt() == 0x01) {
+                        if (buffer.remaining() >= 16) {
+                            val lat = buffer.getDouble()
+                            val lon = buffer.getDouble()
+                            geoLocation = GeoLocation(lat, lon)
+                        }
+                    }
+                }
+
                 return SafeRelayMessage(
                     id = id,
                     sender = sender,
@@ -315,7 +357,10 @@ data class SafeRelayMessage(
                     channel = channel,
                     encryptedContent = encryptedContent,
                     isEncrypted = isEncrypted,
-                    isVerified = true
+                    isVerified = true,
+                    emergencyType = emergencyType,
+                    priorityLevel = priorityLevel,
+                    geoLocation = geoLocation
                 )
 
             } catch (e: Exception) {

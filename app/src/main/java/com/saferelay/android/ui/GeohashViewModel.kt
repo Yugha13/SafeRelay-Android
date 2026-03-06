@@ -207,6 +207,9 @@ class GeohashViewModel(
                     val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, nickname, teleported)
                     val relayManager = NostrRelayManager.getInstance(getApplication())
                     relayManager.sendEventToGeohash(event, channel.geohash, includeDefaults = false, nRelays = 5)
+                    
+                    // NEW: Also broadcast over mesh to reach nearby peers when offline
+                    meshDelegateHandler.sendMessage(content = content, mentions = localMsg.mentions ?: emptyList(), channel = "#${channel.geohash}")
                 } finally {
                     // Ensure we stop the per-message mining animation regardless of success/failure
                     if (startedMining) {
