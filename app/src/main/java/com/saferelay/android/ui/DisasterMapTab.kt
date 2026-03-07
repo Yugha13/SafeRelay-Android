@@ -1,86 +1,59 @@
 package com.saferelay.android.ui
 
-import android.util.Log
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saferelay.android.model.SafeRelayMessage
 import com.saferelay.android.model.EmergencyMessageType
 import com.saferelay.android.model.PriorityLevel
 
-// ─────────────────────────────────────────────────────────────────────────
-// Disaster Map Tab (embedded in main screen)
-// ─────────────────────────────────────────────────────────────────────────
+// MapLibre Imports
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.spatialk.geojson.Position
+import kotlin.math.roundToInt
+
 @Composable
 fun DisasterMapTab(
     messages: List<SafeRelayMessage>,
     peerNicknames: Map<String, String> = emptyMap(),
     onOpenChat: (String, String) -> Unit = { _, _ -> }
 ) {
-    val context = LocalContext.current
     val sosMessages = remember(messages) {
         messages.filter {
             (it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
             it.priorityLevel == PriorityLevel.CRITICAL
         }
     }
-    var mapError by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+    var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF050505))) {
-        if (mapError) {
-            // Fallback: simple SOS list when no internet
-            OfflineMapFallback(sosMessages = sosMessages)
-        } else {
-            LeafletMapView(
-                sosMessages = sosMessages,
-                modifier = Modifier.fillMaxSize(),
-                onError = { mapError = true },
-                onLoaded = { isLoading = false },
-                onMarkerClick = { pid ->
-                    val nick = peerNicknames[pid] ?: pid
-                    onOpenChat(pid, nick)
-                }
-            )
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize().background(Color(0xFF050505)),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = SOSRed, modifier = Modifier.size(40.dp))
-                        Spacer(Modifier.height(12.dp))
-                        Text("Loading map…", fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace, color = Color(0xFF555555))
-                    }
-                }
-            }
-        }
+        SOSMarkerMap(
+            sosMessages = sosMessages,
+            modifier = Modifier.fillMaxSize(),
+            onMarkerClick = { selectedMessage = it }
+        )
 
-        // SOS count badge (top-end)
+        // SOS count badge
         if (sosMessages.isNotEmpty()) {
             Box(
                 modifier = Modifier
@@ -94,87 +67,23 @@ fun DisasterMapTab(
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
             }
         }
-
-        // Offline indicator
-        if (mapError) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(12.dp)
-                    .background(Color(0xFF2A2A2A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.WifiOff, contentDescription = null,
-                        tint = Color(0xFF888888), modifier = Modifier.size(12.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("Offline – SOS list mode", fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace, color = Color(0xFF888888))
-                }
-            }
+        
+        selectedMessage?.let { msg ->
+            val senderId = msg.senderPeerID ?: msg.sender
+            val senderNick = peerNicknames[senderId] ?: msg.sender
+            
+            MarkerDetailDialog(
+                senderId = senderId,
+                senderNick = senderNick,
+                content = msg.content,
+                emoji = msg.emergencyType.emoji,
+                onDismiss = { selectedMessage = null },
+                onOpenChat = onOpenChat
+            )
         }
     }
 }
 
-// Offline fallback: shows SOS list when maps can't load
-@Composable
-private fun OfflineMapFallback(sosMessages: List<SafeRelayMessage>) {
-    Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF050505))
-            .padding(16.dp)
-    ) {
-        Text("🗺️ SOS Location Reports", fontSize = 15.sp, fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace, color = SOSRed)
-        Spacer(Modifier.height(4.dp))
-        Text("Map requires internet. Showing mesh SOS reports.",
-            fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF555555))
-        Spacer(Modifier.height(12.dp))
-
-        if (sosMessages.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("✅", fontSize = 40.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("No SOS reports on mesh", fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace, color = Color(0xFF555555))
-                }
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(sosMessages) { msg ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A0000)),
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, SOSRed.copy(alpha = 0.5f))
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("🆘", fontSize = 24.sp)
-                            Spacer(Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("@${msg.sender}", fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace, color = SOSRed)
-                                msg.geoLocation?.let { geo ->
-                                    Text(
-                                        "📍 ${String.format("%.5f", geo.latitude)}, ${String.format("%.5f", geo.longitude)}",
-                                        fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MeshBlue
-                                    )
-                                }
-                                Text(msg.content.take(80), fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace, color = Color(0xFF999999))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Disaster Map Sheet (full-screen from header button)
-// ─────────────────────────────────────────────────────────────────────────
 @Composable
 fun DisasterMapSheet(
     messages: List<SafeRelayMessage>,
@@ -185,25 +94,16 @@ fun DisasterMapSheet(
     val sosMessages = remember(messages) {
         messages.filter { it.emergencyType == EmergencyMessageType.SOS || it.priorityLevel == PriorityLevel.CRITICAL }
     }
-    var mapError by remember { mutableStateOf(false) }
+    var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-            if (mapError) {
-                OfflineMapFallback(sosMessages = sosMessages)
-            } else {
-                LeafletMapView(
-                    sosMessages = sosMessages,
-                    modifier = Modifier.fillMaxSize(),
-                    onError = { mapError = true },
-                    onLoaded = {},
-                    onMarkerClick = { pid ->
-                        val nick = peerNicknames[pid] ?: pid
-                        onOpenChat(pid, nick)
-                    }
-                )
-            }
+            SOSMarkerMap(
+                sosMessages = sosMessages,
+                modifier = Modifier.fillMaxSize(),
+                onMarkerClick = { selectedMessage = it }
+            )
 
             // Top overlay bar
             Row(
@@ -214,7 +114,6 @@ fun DisasterMapSheet(
                     .align(Alignment.TopStart),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back button
                 Box(
                     modifier = Modifier
                         .size(38.dp)
@@ -237,175 +136,109 @@ fun DisasterMapSheet(
                     Text("Live SOS from mesh network", fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace, color = Color.White.copy(alpha = 0.65f))
                 }
-                Spacer(Modifier.weight(1f))
-                if (sosMessages.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .background(SOSRed.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text("🚨 ${sosMessages.size} SOS", fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+            }
+
+            selectedMessage?.let { msg ->
+                val senderId = msg.senderPeerID ?: msg.sender
+                val senderNick = peerNicknames[senderId] ?: msg.sender
+                
+                MarkerDetailDialog(
+                    senderId = senderId,
+                    senderNick = senderNick,
+                    content = msg.content,
+                    emoji = msg.emergencyType.emoji,
+                    onDismiss = { selectedMessage = null },
+                    onOpenChat = { pid, nick ->
+                        onOpenChat(pid, nick)
+                        onDismiss()
                     }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SOSMarkerMap(
+    sosMessages: List<SafeRelayMessage>,
+    modifier: Modifier = Modifier,
+    onMarkerClick: (SafeRelayMessage) -> Unit
+) {
+    val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
+    val cameraState = rememberCameraState(
+        firstPosition = soupCameraPosition(sosMessages)
+    )
+
+    Box(modifier = modifier) {
+        MaplibreMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraState = cameraState,
+            baseStyle = BaseStyle.Uri(styleUri)
+        )
+
+        // Overlay markers using projection
+        sosMessages.forEach { msg ->
+            msg.geoLocation?.let { geo ->
+                val pos = Position(geo.longitude, geo.latitude)
+                val offset = cameraState.projection?.screenLocationFromPosition(pos)
+                
+                if (offset != null) {
+                    Text(
+                        text = msg.emergencyType.emoji,
+                        fontSize = 28.sp,
+                        modifier = Modifier
+                            .offset(
+                                x = offset.x - 14.dp, // Center approx (28sp ~ 14dp radius)
+                                y = offset.y - 28.dp  // Bottom anchor approx
+                            )
+                            .clickable { onMarkerClick(msg) }
+                    )
                 }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Leaflet WebView – with local asset loading and error detection
-// ─────────────────────────────────────────────────────────────────────────
-@Composable
-fun LeafletMapView(
-    sosMessages: List<SafeRelayMessage>,
-    modifier: Modifier = Modifier,
-    onError: () -> Unit,
-    onLoaded: () -> Unit,
-    onMarkerClick: (String) -> Unit = {}
-) {
-    val html = buildLeafletHtml(sosMessages)
-    val context = LocalContext.current
-
-    // JS Interface for marker clicks and "Send Message" button
-    val jsInterface = remember {
-        object {
-            @android.webkit.JavascriptInterface
-            fun onMarkerTap(peerId: String) {
-                // Main marker click (can show popup or handle direct action)
-                onMarkerClick(peerId)
-            }
-
-            @android.webkit.JavascriptInterface
-            fun sendMessage(peerId: String) {
-                // Specific "Send Message" button click inside popup
-                onMarkerClick(peerId)
-            }
-        }
-    }
-
-    AndroidView(
-        factory = { ctx ->
-            WebView(ctx).apply {
-                addJavascriptInterface(jsInterface, "Android")
-                settings.apply {
-                    javaScriptEnabled = true
-                    domStorageEnabled = true
-                    allowFileAccess = true
-                    setSupportZoom(true)
-                    builtInZoomControls = true
-                    displayZoomControls = false
-                    cacheMode = WebSettings.LOAD_DEFAULT
-                }
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView, url: String?) {
-                        onLoaded()
-                    }
-                    override fun onReceivedError(
-                        view: WebView,
-                        request: WebResourceRequest?,
-                        error: WebResourceError?
-                    ) {
-                        // Leaflet might fail to load tiles offline, but we want the UI code to run.
-                        // Only trigger error if main frame fails significantly.
-                        if (request?.isForMainFrame == true) {
-                            Log.e("LeafletMapView", "WebView Error: ${error?.description}")
-                        }
-                    }
-                }
-                // Base URL pointing to assets allows relative file loading for tiles/scripts if needed
-                loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
-            }
-        },
-        update = { wv ->
-            wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
-        },
-        modifier = modifier
+private fun soupCameraPosition(messages: List<SafeRelayMessage>): CameraPosition {
+    val firstMsg = messages.firstOrNull { it.geoLocation != null }
+    return CameraPosition(
+        target = firstMsg?.geoLocation?.let { Position(it.longitude, it.latitude) } ?: Position(78.9629, 20.5937),
+        zoom = if (firstMsg != null) 8.0 else 4.0
     )
 }
 
-private fun buildLeafletHtml(sosMessages: List<SafeRelayMessage>): String {
-    val markersJs = buildString {
-        sosMessages.forEachIndexed { i, msg ->
-            // Use real GPS if available, scatter across a default region if not (e.g. India center)
-            val lat = msg.geoLocation?.latitude ?: (20.5 + (i % 10) * 0.05)
-            val lon = msg.geoLocation?.longitude ?: (78.9 + (i % 10) * 0.05)
-            val title = "${msg.emergencyType.emoji} @${msg.sender}".replace("'", "\\'")
-            val body = msg.content.take(120).replace("'", "\\'").replace("\n", " ")
-            val pid = msg.senderPeerID ?: msg.sender
-            
-            // Generate distinct colors for different types
-            val glowColor = when(msg.emergencyType) {
-                EmergencyMessageType.SOS -> "#FF0000"
-                EmergencyMessageType.MEDICAL_REQUEST -> "#FF4444"
-                EmergencyMessageType.RESOURCE_UPDATE -> "#44FF44"
-                else -> "#FFCC00"
+@Composable
+private fun MarkerDetailDialog(
+    senderId: String,
+    senderNick: String,
+    content: String,
+    emoji: String,
+    onDismiss: () -> Unit,
+    onOpenChat: (String, String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Text(emoji, fontSize = 32.sp) },
+        title = { Text(senderNick, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
+        text = { Text(content, fontSize = 14.sp) },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onOpenChat(senderId, senderNick)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = SOSRed)
+            ) {
+                Text("SEND MESSAGE", fontWeight = FontWeight.Bold)
             }
-
-            append("""
-                var icon$i = L.divIcon({
-                  html:'<div style="font-size:28px;filter:drop-shadow(0 0 8px $glowColor);">${msg.emergencyType.emoji}</div>',
-                  iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-18],className:''
-                });
-
-                L.marker([$lat,$lon],{icon:icon$i})
-                  .addTo(map)
-                  .bindPopup(`
-                    <div style="color:#eee;font-family:monospace;min-width:160px;">
-                        <b style="color:#ff4444;font-size:14px;">$title</b>
-                        <p style="margin:8px 0;font-size:12px;color:#ccc;">$body</p>
-                        <button onclick="Android.sendMessage('$pid')" 
-                                style="width:100%;padding:8px;background:#CC0000;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-family:monospace;">
-                            SEND MESSAGE
-                        </button>
-                    </div>
-                  `, {maxWidth: 240, className: 'sr-popup'});
-            """.trimIndent())
-            append("\n")
-        }
-    }
-
-    // Default center: India or first message location
-    val centerLat = sosMessages.firstOrNull()?.geoLocation?.latitude ?: 20.5937
-    val centerLon = sosMessages.firstOrNull()?.geoLocation?.longitude ?: 78.9629
-    val zoom = if (sosMessages.any { it.geoLocation != null }) 9 else 5
-
-    return """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<link rel="stylesheet" href="leaflet/leaflet.css" />
-<script src="leaflet/leaflet.js"></script>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body,#map{height:100%;width:100%;background:#050505}
-  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-    background: #151515 !important;
-    border: 1px solid #330000;
-  }
-  .leaflet-popup-content { margin: 12px; }
-  .sr-popup .leaflet-popup-close-button { color: #888 !important; }
-</style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-var map = L.map('map',{center:[$centerLat,$centerLon],zoom:$zoom,zoomControl:false});
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OSM',
-  maxZoom:19,
-  subdomains:['a','b','c']
-}).addTo(map);
-
-// Add zoom control at bottom right
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-$markersJs
-</script>
-</body>
-</html>
-""".trimIndent()
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CLOSE")
+            }
+        },
+        containerColor = Color(0xFF151515),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFCCCCCC)
+    )
 }

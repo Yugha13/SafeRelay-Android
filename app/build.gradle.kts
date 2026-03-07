@@ -139,6 +139,11 @@ dependencies {
     // Google Play Services Location
     implementation(libs.gms.location)
 
+    // MapLibre
+    implementation(libs.maplibre.compose)
+    implementation(libs.maplibre.android)
+    implementation(libs.spatialk.geojson)
+
     // Security preferences
     implementation(libs.androidx.security.crypto)
     

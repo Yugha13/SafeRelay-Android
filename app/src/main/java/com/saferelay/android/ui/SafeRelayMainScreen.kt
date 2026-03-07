@@ -132,7 +132,9 @@ fun SafeRelayMainScreen(
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         peerNicknames = peerNicknames,
-                        onOpenChat = onOpenPrivateChat
+                        onOpenChat = { pid: String, nick: String ->
+                            onOpenPrivateChat(pid, nick)
+                        }
                     )
                     SafeRelayTab.NEARBY -> NearbyDevicesTab(
                         connectedPeers = connectedPeers,
@@ -198,7 +200,7 @@ fun SafeRelayMainScreen(
         DisasterMapSheet(
             messages = messages,
             peerNicknames = peerNicknames,
-            onOpenChat = { pid, nick ->
+            onOpenChat = { pid: String, nick: String ->
                 showDisasterMap = false
                 onOpenPrivateChat(pid, nick)
             },
