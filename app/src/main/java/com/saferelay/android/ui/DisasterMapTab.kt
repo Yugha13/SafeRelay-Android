@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,11 @@ import android.location.Location
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.camera.rememberCameraState
+import androidx.compose.ui.layout.layout
+import kotlinx.coroutines.launch
+import org.maplibre.compose.map.MapOptions
+import org.maplibre.compose.map.OrnamentOptions
+import androidx.compose.foundation.layout.BoxScope
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.roundToInt
@@ -170,6 +176,7 @@ fun SOSMarkerMap(
     val context = LocalContext.current
     val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
     val myLocation by locationManager.currentLocation.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     
     val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
     val cameraState = rememberCameraState(
@@ -188,7 +195,8 @@ fun SOSMarkerMap(
         MaplibreMap(
             modifier = Modifier.fillMaxSize(),
             cameraState = cameraState,
-            baseStyle = BaseStyle.Uri(styleUri)
+            baseStyle = BaseStyle.Uri(styleUri),
+            options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled)
         )
 
         // Overlay markers using projection
@@ -202,10 +210,15 @@ fun SOSMarkerMap(
                         text = msg.emergencyType.emoji,
                         fontSize = 28.sp,
                         modifier = Modifier
-                            .offset(
-                                x = offset.x - 14.dp, // Center approx (28sp ~ 14dp radius)
-                                y = offset.y - 28.dp  // Bottom anchor approx
-                            )
+                            .layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints)
+                                layout(placeable.width, placeable.height) {
+                                    // Apply offset directly in layout phase for tighter sync
+                                    val finalX = offset.x.value * density - (placeable.width / 2)
+                                    val finalY = offset.y.value * density - placeable.height
+                                    placeable.placeWithLayer(finalX.roundToInt(), finalY.roundToInt())
+                                }
+                            }
                             .clickable { onMarkerClick(msg) }
                     )
                 }
@@ -220,10 +233,14 @@ fun SOSMarkerMap(
             if (offset != null) {
                 Box(
                     modifier = Modifier
-                        .offset(
-                            x = offset.x - 12.dp,
-                            y = offset.y - 12.dp
-                        )
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            layout(placeable.width, placeable.height) {
+                                val finalX = offset.x.value * density - (placeable.width / 2)
+                                val finalY = offset.y.value * density - (placeable.height / 2)
+                                placeable.placeWithLayer(finalX.roundToInt(), finalY.roundToInt())
+                            }
+                        }
                         .size(24.dp)
                         .background(Color.White, CircleShape)
                         .padding(2.dp)
@@ -239,6 +256,31 @@ fun SOSMarkerMap(
                     )
                 }
             }
+        }
+        
+        // My Location Button
+        FloatingActionButton(
+            onClick = {
+                myLocation?.let { loc ->
+                    coroutineScope.launch {
+                        val pos = Position(loc.longitude, loc.latitude)
+                        cameraState.animateTo(
+                            finalPosition = CameraPosition(target = pos, zoom = 14.0)
+                        )
+                    }
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .padding(bottom = 90.dp), // Clear bottom nav
+            containerColor = Color(0xFF222222),
+            contentColor = Color.White
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MyLocation,
+                contentDescription = "My Location"
+            )
         }
     }
 }
