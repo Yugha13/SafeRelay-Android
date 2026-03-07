@@ -98,6 +98,9 @@ class LocationChannelManager private constructor(private val context: Context) {
     
     private val _isLoadingLocation = MutableStateFlow(false)
     val isLoadingLocation: StateFlow<Boolean> = _isLoadingLocation
+
+    private val _currentLocation = MutableStateFlow<Location?>(null)
+    val currentLocation: StateFlow<Location?> = _currentLocation
     
     private val _locationServicesEnabled = MutableStateFlow(false)
     val locationServicesEnabled: StateFlow<Boolean> = _locationServicesEnabled
@@ -325,6 +328,7 @@ class LocationChannelManager private constructor(private val context: Context) {
 
     private fun onLocationUpdated(location: Location) {
         lastLocation = location
+        _currentLocation.value = location
         _isLoadingLocation.value = false
         computeChannels(location)
         reverseGeocodeIfNeeded(location)

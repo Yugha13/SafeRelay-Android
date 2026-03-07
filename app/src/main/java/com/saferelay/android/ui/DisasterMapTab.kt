@@ -11,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -23,6 +25,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.saferelay.android.model.SafeRelayMessage
 import com.saferelay.android.model.EmergencyMessageType
 import com.saferelay.android.model.PriorityLevel
+import android.location.Location
 
 // MapLibre Imports
 import org.maplibre.compose.map.MaplibreMap
@@ -164,10 +167,22 @@ fun SOSMarkerMap(
     modifier: Modifier = Modifier,
     onMarkerClick: (SafeRelayMessage) -> Unit
 ) {
+    val context = LocalContext.current
+    val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
+    val myLocation by locationManager.currentLocation.collectAsState()
+    
     val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
     val cameraState = rememberCameraState(
-        firstPosition = soupCameraPosition(sosMessages)
+        firstPosition = soupCameraPosition(sosMessages, myLocation)
     )
+
+    // Keep location fresh while map is open
+    DisposableEffect(Unit) {
+        locationManager.beginLiveRefresh()
+        onDispose {
+            locationManager.endLiveRefresh()
+        }
+    }
 
     Box(modifier = modifier) {
         MaplibreMap(
@@ -196,14 +211,49 @@ fun SOSMarkerMap(
                 }
             }
         }
+
+        // Current User Location Marker
+        myLocation?.let { loc ->
+            val pos = Position(loc.longitude, loc.latitude)
+            val offset = cameraState.projection?.screenLocationFromPosition(pos)
+            
+            if (offset != null) {
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = offset.x - 12.dp,
+                            y = offset.y - 12.dp
+                        )
+                        .size(24.dp)
+                        .background(Color.White, CircleShape)
+                        .padding(2.dp)
+                        .background(com.saferelay.android.ui.MeshBlue, CircleShape)
+                        .border(1.dp, Color.White, CircleShape)
+                ) {
+                    Text(
+                        "YOU",
+                        color = Color.White,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+        }
     }
 }
 
-private fun soupCameraPosition(messages: List<SafeRelayMessage>): CameraPosition {
+private fun soupCameraPosition(messages: List<SafeRelayMessage>, myLocation: Location?): CameraPosition {
     val firstMsg = messages.firstOrNull { it.geoLocation != null }
+    val target = if (myLocation != null) {
+        Position(myLocation.longitude, myLocation.latitude)
+    } else {
+        firstMsg?.geoLocation?.let { Position(it.longitude, it.latitude) } ?: Position(78.9629, 20.5937)
+    }
+    
     return CameraPosition(
-        target = firstMsg?.geoLocation?.let { Position(it.longitude, it.latitude) } ?: Position(78.9629, 20.5937),
-        zoom = if (firstMsg != null) 8.0 else 4.0
+        target = target,
+        zoom = if (myLocation != null || firstMsg != null) 12.0 else 4.0
     )
 }
 
