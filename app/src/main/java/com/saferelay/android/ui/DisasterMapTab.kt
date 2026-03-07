@@ -41,6 +41,33 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.roundToInt
 
+import org.maplibre.compose.location.Location as MapLibreLocation
+import org.maplibre.compose.location.LocationProvider
+import org.maplibre.compose.location.UserLocationState
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.LocationPuckColors
+import org.maplibre.compose.sources.rememberGeoJsonSource
+import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.Feature
+import org.maplibre.spatialk.geojson.Point
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import org.maplibre.compose.expressions.dsl.feature
+import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.dsl.format
+import org.maplibre.compose.expressions.dsl.span
+import org.maplibre.compose.expressions.dsl.asString
+import org.maplibre.compose.layers.SymbolLayer
+import kotlinx.coroutines.flow.map
+import androidx.compose.ui.unit.em
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlin.time.TimeSource
+import org.maplibre.compose.util.ClickResult
+
 @Composable
 fun DisasterMapTab(
     messages: List<SafeRelayMessage>,
@@ -178,6 +205,27 @@ fun SOSMarkerMap(
     val myLocation by locationManager.currentLocation.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     
+    // Bridge our location flow to MapLibre's LocationProvider
+    val mapLibreLocationProvider = remember(locationManager) {
+        object : LocationProvider {
+            override val location = locationManager.currentLocation.map { loc ->
+                loc?.let {
+                    MapLibreLocation(
+                        position = Position(it.longitude, it.latitude),
+                        accuracy = it.accuracy.toDouble(),
+                        bearing = it.bearing.toDouble(),
+                        bearingAccuracy = null, // Android Location API doesn't guarantee bearing accuracy directly without SDK checks
+                        speed = it.speed.toDouble(),
+                        speedAccuracy = null,
+                        timestamp = TimeSource.Monotonic.markNow()
+                    )
+                }
+            }.stateIn(coroutineScope, SharingStarted.WhileSubscribed(5000), null)
+        }
+    }
+    
+    val userLocationState = org.maplibre.compose.location.rememberUserLocationState(locationProvider = mapLibreLocationProvider)
+
     val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
     val cameraState = rememberCameraState(
         firstPosition = soupCameraPosition(sosMessages, myLocation)
@@ -197,64 +245,63 @@ fun SOSMarkerMap(
             cameraState = cameraState,
             baseStyle = BaseStyle.Uri(styleUri),
             options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled)
-        )
+        ) {
+            // 1. Native My Location Puck
+            LocationPuck(
+                idPrefix = "user-location",
+                locationState = userLocationState,
+                cameraState = cameraState,
+                colors = LocationPuckColors(
+                    dotFillColorCurrentLocation = com.saferelay.android.ui.MeshBlue,
+                    accuracyFillColor = com.saferelay.android.ui.MeshBlue.copy(alpha = 0.3f),
+                    accuracyStrokeColor = com.saferelay.android.ui.MeshBlue
+                ),
+                onClick = {
+                    coroutineScope.launch {
+                        cameraState.animateTo(
+                            finalPosition = CameraPosition(target = it.position, zoom = 14.0)
+                        )
+                    }
+                }
+            )
 
-        // Overlay markers using projection
-        sosMessages.forEach { msg ->
-            msg.geoLocation?.let { geo ->
-                val pos = Position(geo.longitude, geo.latitude)
-                val offset = cameraState.projection?.screenLocationFromPosition(pos)
+            // 2. Native SOS Markers
+            if (sosMessages.isNotEmpty()) {
+                val features = sosMessages.mapNotNull { msg ->
+                    msg.geoLocation?.let { geo ->
+                        Feature(
+                            geometry = Point(longitude = geo.longitude, latitude = geo.latitude),
+                            properties = buildJsonObject {
+                                put("emoji", JsonPrimitive(msg.emergencyType.emoji))
+                                put("id", JsonPrimitive(msg.id))
+                            }
+                        )
+                    }
+                }
                 
-                if (offset != null) {
-                    Text(
-                        text = msg.emergencyType.emoji,
-                        fontSize = 28.sp,
-                        modifier = Modifier
-                            .layout { measurable, constraints ->
-                                val placeable = measurable.measure(constraints)
-                                layout(placeable.width, placeable.height) {
-                                    // Apply offset directly in layout phase for tighter sync
-                                    val finalX = offset.x.value * density - (placeable.width / 2)
-                                    val finalY = offset.y.value * density - placeable.height
-                                    placeable.placeWithLayer(finalX.roundToInt(), finalY.roundToInt())
-                                }
-                            }
-                            .clickable { onMarkerClick(msg) }
-                    )
-                }
-            }
-        }
-
-        // Current User Location Marker
-        myLocation?.let { loc ->
-            val pos = Position(loc.longitude, loc.latitude)
-            val offset = cameraState.projection?.screenLocationFromPosition(pos)
-            
-            if (offset != null) {
-                Box(
-                    modifier = Modifier
-                        .layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints)
-                            layout(placeable.width, placeable.height) {
-                                val finalX = offset.x.value * density - (placeable.width / 2)
-                                val finalY = offset.y.value * density - (placeable.height / 2)
-                                placeable.placeWithLayer(finalX.roundToInt(), finalY.roundToInt())
-                            }
+                val source = rememberGeoJsonSource(
+                    data = GeoJsonData.Features(FeatureCollection(features = features))
+                )
+                
+                SymbolLayer(
+                    id = "sos-markers",
+                    source = source,
+                    textField = format(span(feature["emoji"].asString())),
+                    textSize = const(2f.em),
+                    onClick = { clickedFeatures ->
+                        val props = clickedFeatures.firstOrNull()?.properties?.let { 
+                            if (it is kotlinx.serialization.json.JsonObject) it else null 
                         }
-                        .size(24.dp)
-                        .background(Color.White, CircleShape)
-                        .padding(2.dp)
-                        .background(com.saferelay.android.ui.MeshBlue, CircleShape)
-                        .border(1.dp, Color.White, CircleShape)
-                ) {
-                    Text(
-                        "YOU",
-                        color = Color.White,
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
+                        
+                        val clickedId = props?.get("id")?.toString()?.trim('"')
+                                     
+                        if (clickedId != null) {
+                            val msg = sosMessages.find { it.id == clickedId }
+                            if (msg != null) onMarkerClick(msg)
+                        }
+                        ClickResult.Consume
+                    }
+                )
             }
         }
         
