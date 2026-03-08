@@ -105,7 +105,7 @@ fun SafeRelayMessagingScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        color = DarkBg
+        color = Color(0xFFF5F5F5)
     ) {
         Column(modifier = Modifier.fillMaxSize().imePadding()) {
 
@@ -136,7 +136,7 @@ fun SafeRelayMessagingScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1A0000))
+                        .background(SOSRed.copy(alpha = 0.05f))
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -154,7 +154,7 @@ fun SafeRelayMessagingScreen(
                 }
             }
 
-            HorizontalDivider(color = Color(0xFF1A1A1A))
+            HorizontalDivider(color = Color(0xFFEEEEEE))
 
             // ── Input bar ──────────────────────────────────────────────
             MessagingInputBar(
@@ -219,7 +219,7 @@ private fun MessagingTopBar(title: String, subtitle: String, onBack: () -> Unit)
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color(0xFF080808))
+            .background(Color.White)
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -228,10 +228,10 @@ private fun MessagingTopBar(title: String, subtitle: String, onBack: () -> Unit)
                 tint = SOSRed, modifier = Modifier.size(22.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace, color = Color(0xFFEEEEEE))
-            Text(subtitle, fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace, color = Color(0xFF555555))
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                color = Color.Black)
+            Text(subtitle, fontSize = 11.sp,
+                color = Color.Gray)
         }
         // Peer profile indicator
         Box(
@@ -254,16 +254,16 @@ private fun MessagingTopBar(title: String, subtitle: String, onBack: () -> Unit)
 private fun MessageBubble(message: SafeRelayMessage, isOwn: Boolean) {
     val isSos = message.emergencyType == EmergencyMessageType.SOS
     val bubbleColor = when {
-        isSos -> Color(0xFF3D0000)
-        isOwn -> Color(0xFF2A0A0A)     // Own: dark red tint
-        else  -> Color(0xFF111111)     // Others: dark gray
+        isSos -> Color(0xFFFFEBEE)
+        isOwn -> Color(0xFFFFF0F0)     // Own: soft red tint
+        else  -> Color.White           // Others: pure white
     }
     val borderColor = when {
-        isSos -> SOSRed.copy(alpha = 0.7f)
-        isOwn -> SOSRed.copy(alpha = 0.4f)
-        else  -> Color(0xFF2A2A2A)
+        isSos -> SOSRed.copy(alpha = 0.8f)
+        isOwn -> SOSRed.copy(alpha = 0.3f)
+        else  -> Color(0xFFE0E0E0)
     }
-    val textColor = if (isSos) SOSRed else Color(0xFFDDDDDD)
+    val textColor = if (isSos) SOSRed else Color(0xFF1A1A1A)
     val alignment = if (isOwn) Alignment.End else Alignment.Start
 
     Column(
@@ -403,7 +403,7 @@ private fun MessagingInputBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF080808))
+            .background(Color.White)
     ) {
         Row(
             modifier = Modifier
@@ -428,18 +428,18 @@ private fun MessagingInputBar(
                 value = text,
                 onValueChange = onTextChange,
                 placeholder = {
-                    Text("Message…", color = Color(0xFF444444),
-                        fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                    Text("Message…", color = Color.Gray,
+                        fontSize = 14.sp)
                 },
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color(0xFF222222),
-                    focusedBorderColor = SOSRed.copy(alpha = 0.45f),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedBorderColor = SOSRed,
                     cursorColor = SOSRed,
-                    unfocusedTextColor = Color(0xFFCCCCCC),
-                    focusedTextColor = Color.White,
-                    unfocusedContainerColor = Color(0xFF111111),
-                    focusedContainerColor = Color(0xFF111111)
+                    unfocusedTextColor = Color.Black,
+                    focusedTextColor = Color.Black,
+                    unfocusedContainerColor = Color(0xFFFAFAFA),
+                    focusedContainerColor = Color.White
                 ),
                 shape = RoundedCornerShape(24.dp),
                 textStyle = androidx.compose.ui.text.TextStyle(
