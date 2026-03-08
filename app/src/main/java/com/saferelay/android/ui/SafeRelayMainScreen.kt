@@ -359,18 +359,25 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
 
         Spacer(Modifier.weight(0.5f))
 
-        // Swipe slider at the bottom
-        SwipeToConfirmSlider(
+        // Safety Action Button at the bottom
+        SafetyActionButton(
             isSosActive = isSosActive,
-            onSwipeComplete = {
+            onClick = {
                 if (!isSosActive) {
-                    // Trigger SOS
-                    isSosActive = true
+                    // Send a "Check-in" or safety broadcast
                     val geo = getLastLocation(context)
-                    val bat = getBatteryPercent(context)
-                    val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                    viewModel.sendEmergencyMessage(sos)
-                    SosManager.triggerSosHaptic(context)
+                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                    val msg = SafeRelayMessage(
+                        sender = viewModel.myNickname,
+                        content = "📍 CHECK-IN: @${viewModel.myNickname} ($name) is currently safe." +
+                            (geo?.let { "\nLocation: ${String.format("%.4f", it.latitude)}, ${String.format("%.4f", it.longitude)}" } ?: ""),
+                        timestamp = java.util.Date(),
+                        emergencyType = EmergencyMessageType.SAFE_STATUS,
+                        priorityLevel = PriorityLevel.URGENT,
+                        geoLocation = geo
+                    )
+                    viewModel.sendEmergencyMessage(msg)
+                    android.widget.Toast.makeText(context, "Safety status shared!", android.widget.Toast.LENGTH_SHORT).show()
                 } else {
                     // Cancel SOS / Send I'm Safe
                     isSosActive = false
@@ -1024,75 +1031,45 @@ fun OverlappingAvatars(peers: List<String>, peerNicknames: Map<String, String>) 
 }
 
 @Composable
-fun SwipeToConfirmSlider(
-    modifier: Modifier = Modifier,
+fun SafetyActionButton(
     isSosActive: Boolean,
-    onSwipeComplete: () -> Unit
+    onClick: () -> Unit
 ) {
-    val density = LocalDensity.current
-    val thumbSize = 56.dp
-    val thumbSizePx = with(density) { thumbSize.toPx() }
-    val offsetXState = remember { mutableStateOf<Float>(0f) }
-    val maxWidthPxState = remember { mutableStateOf<Float>(0f) }
-    
-    val text = if (isSosActive) "Swipe to cancel SOS" else "Swipe to launch SOS"
     val containerColor = if (isSosActive) SafeGreen else Color.Black
-    val thumbColor = if (isSosActive) Color.White else Color.White
-    val contentColor = if (isSosActive) Color.White else Color.White
-
-    Box(
-        modifier = modifier
+    val textColor = Color.White
+    val text = if (isSosActive) "I'M SAFE NOW" else "SHARE SAFETY STATUS"
+    
+    Card(
+        modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(36.dp))
-            .background(containerColor)
-            .onGloballyPositioned { maxWidthPxState.value = it.size.width.toFloat() },
-        contentAlignment = Alignment.CenterStart
+            .height(64.dp)
+            .clickable { onClick() }
+            .shadow(4.dp, RoundedCornerShape(32.dp)),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
-        // Text
-        Text(
-            text = text,
-            color = contentColor,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
-        
-        // Draggable Thumb
         Box(
-            modifier = Modifier
-                .offset { androidx.compose.ui.unit.IntOffset(offsetXState.value.toInt(), 0) }
-                .padding(8.dp)
-                .size(thumbSize)
-                .clip(CircleShape)
-                .background(thumbColor)
-                .pointerInput(isSosActive) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val maxPx = maxWidthPxState.value
-                            if (maxPx > 0f && offsetXState.value > maxPx - thumbSizePx - 32f) { // threshold
-                                onSwipeComplete()
-                            }
-                            offsetXState.value = 0f
-                        }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        val newX: Float = offsetXState.value + dragAmount
-                        val maxPx: Float = maxWidthPxState.value
-                        val threshold: Float = maxPx - thumbSizePx - 16f
-                        if (newX >= 0f && newX <= threshold) {
-                            offsetXState.value = newX
-                        }
-                    }
-                },
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Filled.ArrowForward,
-                contentDescription = null,
-                tint = Color.Black
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!isSosActive) {
+                    Icon(
+                        Icons.Filled.VerifiedUser,
+                        contentDescription = null,
+                        tint = SafeGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.2.sp
+                )
+            }
         }
     }
 }
