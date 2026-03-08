@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import com.saferelay.android.model.*
 import com.saferelay.android.ui.SosManager.isSosAlert
+import com.saferelay.android.ui.theme.SafeRelayTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -132,7 +133,9 @@ fun SafeRelayMainScreen(
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
                     SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { selectedTab = SafeRelayTab.PROFILE })
-                    SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel, embedded = true)
+                    SafeRelayTab.CHAT   -> SafeRelayTheme(darkTheme = false) {
+                        ChatScreen(viewModel = viewModel, embedded = true)
+                    }
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         peerNicknames = peerNicknames,

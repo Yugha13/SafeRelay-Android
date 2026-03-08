@@ -111,7 +111,7 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorScheme.background) // Extend background to fill entire screen including status bar
+            .background(Color(0xFFF5F5F5)) // SafeRelay Light Background
     ) {
         val headerHeight = 42.dp
         
@@ -251,7 +251,8 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .zIndex(1f),
-                color = colorScheme.background
+                color = Color.White,
+                shadowElevation = 2.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -265,14 +266,14 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
                         Text(
                             "SafeRelay/",
                             style = MaterialTheme.typography.titleMedium,
-                            color = colorScheme.primary,
+                            color = SOSRed,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             "@$nickname",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = colorScheme.onSurface.copy(alpha = 0.7f)
+                            color = Color.Gray
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -414,7 +415,7 @@ fun ChatInputSection(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = colorScheme.background
+        color = Color.White
     ) {
         Column {
             HorizontalDivider(color = colorScheme.outline.copy(alpha = 0.3f))

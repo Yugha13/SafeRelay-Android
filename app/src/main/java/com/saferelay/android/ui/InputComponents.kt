@@ -196,10 +196,10 @@ fun MessageInput(
                 value = value,
                 onValueChange = onValueChange,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = colorScheme.primary,
+                    color = colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace
                 ),
-                cursorBrush = SolidColor(if (isRecording) Color.Transparent else colorScheme.primary),
+                cursorBrush = SolidColor(if (isRecording) Color.Transparent else SOSRed),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { 
                     if (hasText) onSend() // Only send if there's text
@@ -222,7 +222,7 @@ fun MessageInput(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace
                     ),
-                    color = colorScheme.onSurface.copy(alpha = 0.5f), // Muted grey
+                    color = Color.Gray, // Standard search/input gray
                     modifier = Modifier.fillMaxWidth()
                 )
             }
