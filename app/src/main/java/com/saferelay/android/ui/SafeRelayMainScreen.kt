@@ -159,8 +159,8 @@ fun SafeRelayMainScreen(
                 HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
 
                 NavigationBar(
-                    containerColor = Color(0xFF0A0A0A),
-                    tonalElevation = 0.dp,
+                    containerColor = Color.White,
+                    tonalElevation = 2.dp,
                     modifier = Modifier.navigationBarsPadding()
                 ) {
                     SafeRelayTab.values().forEach { tab ->
@@ -235,7 +235,7 @@ private fun SafeRelayHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "SafeZ",
+            text = "SafeRelay",
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold,
             color = Color.Black,
