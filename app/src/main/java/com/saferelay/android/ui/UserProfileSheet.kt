@@ -46,14 +46,14 @@ fun UserProfileSheet(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = DarkBg
+            color = Color(0xFFF5F5F5)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF0A0A0A))
+                        .background(Color.White)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -61,11 +61,10 @@ fun UserProfileSheet(
                         Icon(Icons.Filled.Close, contentDescription = "Close", tint = SOSRed)
                     }
                     Text(
-                        "My Profile",
+                        "Edit Profile",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = SOSRed,
+                        color = Color.Black,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = {
@@ -126,8 +125,9 @@ fun UserProfileSheet(
                         contacts.forEachIndexed { idx, contact ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
                                 Column(modifier = Modifier.padding(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -191,13 +191,13 @@ fun UserProfileSheet(
 private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBg)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace, color = SOSRed)
-            HorizontalDivider(color = SOSRed.copy(alpha = 0.2f), thickness = 0.5.dp)
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
             content()
         }
     }
@@ -217,14 +217,16 @@ private fun ProfileField(
         modifier = Modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         textStyle = androidx.compose.ui.text.TextStyle(
-            fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Color(0xFFDDDDDD)
+            fontSize = 14.sp, color = Color.Black
         ),
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = Color(0xFF2A2A2A),
-            focusedBorderColor = SOSRed.copy(alpha = 0.5f),
-            unfocusedLabelColor = Color(0xFF666666),
+            unfocusedBorderColor = Color(0xFFE0E0E0),
+            focusedBorderColor = SOSRed,
+            unfocusedLabelColor = Color.Gray,
             focusedLabelColor = SOSRed,
-            cursorColor = SOSRed
+            cursorColor = SOSRed,
+            unfocusedContainerColor = Color(0xFFFAFAFA),
+            focusedContainerColor = Color.White
         ),
         shape = RoundedCornerShape(8.dp),
         singleLine = label != "Address" && label != "Medical Conditions"

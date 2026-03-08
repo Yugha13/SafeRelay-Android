@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import com.saferelay.android.model.*
 import com.saferelay.android.ui.SosManager.isSosAlert
@@ -62,9 +63,9 @@ val MeshBlue   = Color(0xFF3A8FFF)
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     STATUS("Home", Icons.Filled.Home),
-    CHAT("ZChat", Icons.Filled.Chat),
-    MAP("Contacts", Icons.Filled.Contacts),
-    NEARBY("Profile", Icons.Filled.Person),
+    CHAT("Chat", Icons.Filled.Chat),
+    MAP("Map", Icons.Filled.Map),
+    PROFILE("Profile", Icons.Filled.Person),
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -122,15 +123,15 @@ fun SafeRelayMainScreen(
                     profile = profile,
                     connectedPeerCount = connectedPeers.size,
                     onMapClick = { showDisasterMap = true },
-                    onProfileClick = { showProfile = true },
-                    onBrandClick = onOpenMeshChat
+                    onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
+                    onBrandClick = { selectedTab = SafeRelayTab.STATUS }
                 )
             }
 
             // ── Body ───────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
-                    SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { showProfile = true })
+                    SafeRelayTab.STATUS -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { selectedTab = SafeRelayTab.PROFILE })
                     SafeRelayTab.CHAT   -> ChatScreen(viewModel = viewModel, embedded = true)
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
@@ -139,17 +140,11 @@ fun SafeRelayMainScreen(
                             onOpenPrivateChat(pid, nick)
                         }
                     )
-                    SafeRelayTab.NEARBY -> NearbyDevicesTab(
-                        connectedPeers = connectedPeers,
-                        peerNicknames = peerNicknames,
-                        peerRSSI = viewModel.peerRSSI.collectAsState(emptyMap()).value,
-                        peerDirect = viewModel.peerDirect.collectAsState(emptyMap()).value,
-                        onStartChat = { peer -> 
-                            val nick = peerNicknames[peer] ?: peer
-                            viewModel.startPrivateChat(peer)
-                            onOpenPrivateChat(peer, nick)
-                        },
-                        onScan = { viewModel.meshService.sendBroadcastAnnounce() }
+                    SafeRelayTab.PROFILE -> ProfileTab(
+                        viewModel = viewModel,
+                        profile = profile,
+                        profileManager = profileManager,
+                        onEditProfile = { showProfile = true }
                     )
                 }
             }
@@ -1131,6 +1126,149 @@ fun ProfessionalSosButton(onSosTriggered: () -> Unit) {
                     fontFamily = FontFamily.SansSerif
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun ProfileTab(
+    viewModel: ChatViewModel,
+    profile: UserProfile,
+    profileManager: UserProfileManager,
+    onEditProfile: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5))
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Large Profile Avatar
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(SOSRed.copy(alpha = 0.1f))
+                .border(2.dp, SOSRed.copy(alpha = 0.2f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            val initials = if (profile.fullName.isNotBlank()) {
+                profile.fullName.split(" ").filter { it.isNotBlank() }.take(2).map { it[0] }.joinToString("")
+            } else {
+                viewModel.myNickname.take(2).uppercase()
+            }
+            Text(
+                text = initials,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = SOSRed
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Text(
+            text = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.Black
+        )
+        Text(
+            text = "SafeRelay Verified User",
+            fontSize = 14.sp,
+            color = Color.Gray,
+            fontWeight = FontWeight.Medium
+        )
+        
+        Spacer(Modifier.height(32.dp))
+        
+        // Action Sections
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            ProfileMenuRow(
+                icon = Icons.Filled.Edit,
+                title = "Edit Profile",
+                subtitle = "Update your info and emergency contacts",
+                onClick = onEditProfile
+            )
+            
+            ProfileMenuRow(
+                icon = Icons.Filled.Info,
+                title = "Personal Information",
+                subtitle = "Age, Gender, Blood Group, etc.",
+                onClick = { /* Could show restricted read-only view */ }
+            )
+            
+            ProfileMenuRow(
+                icon = Icons.Filled.Settings,
+                title = "App Settings",
+                subtitle = "Notifications, Mesh Networking, Data",
+                onClick = { /* Settings logic */ }
+            )
+            
+            ProfileMenuRow(
+                icon = Icons.Filled.PrivacyTip,
+                title = "Privacy & Security",
+                subtitle = "Encryption keys and visibility",
+                onClick = { /* Privacy logic */ }
+            )
+        }
+        
+        Spacer(Modifier.weight(1f))
+        
+        Text(
+            text = "SafeRelay Android v1.7.1",
+            fontSize = 12.sp,
+            color = Color.LightGray,
+            fontWeight = FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+fun ProfileMenuRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF0F0F0)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+            }
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+            }
+            
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.LightGray)
         }
     }
 }
