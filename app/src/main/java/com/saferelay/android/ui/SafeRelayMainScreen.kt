@@ -45,7 +45,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 // ── Colour constants ───────────────────────────────────────────────────────
 val SOSRed     = Color(0xFFFF3B30)
 val UrgentOrange = Color(0xFFFF9500)
@@ -105,7 +108,7 @@ fun SafeRelayMainScreen(
     // Use statusBarsPadding + imePadding at root level
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = DarkBg
+        color = Color(0xFFF5F5F5)
     ) {
         Column(
             modifier = Modifier
@@ -121,7 +124,6 @@ fun SafeRelayMainScreen(
                     onProfileClick = { showProfile = true },
                     onBrandClick = onOpenMeshChat
                 )
-                HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
             }
 
             // ── Body ───────────────────────────────────────────────────
@@ -226,60 +228,43 @@ private fun SafeRelayHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .background(DarkBg)
-            .padding(horizontal = 14.dp),
+            .height(64.dp)
+            .background(Color(0xFFF5F5F5))
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "SafeRelay/",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
-            color = SOSRed,
+            text = "SafeRelay",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
             modifier = Modifier.clickable { onBrandClick() }
         )
 
-        Spacer(Modifier.width(8.dp))
-
-        // Profile avatar
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(SOSRed.copy(alpha = 0.2f))
-                .border(1.dp, SOSRed.copy(alpha = 0.5f), CircleShape)
-                .clickable { onProfileClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (profile.fullName.isBlank()) "?" else profile.initials,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = SOSRed
-            )
-        }
-
         Spacer(Modifier.weight(1f))
 
-        IconButton(onClick = onMapClick) {
-            Icon(Icons.Filled.Map, contentDescription = "Map", tint = SOSRed, modifier = Modifier.size(22.dp))
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .clickable { /* TBD handle notification click */ },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Notifications, contentDescription = "Notifications", tint = Color.Black, modifier = Modifier.size(24.dp))
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.Wifi,
-                contentDescription = "Nodes",
-                tint = if (connectedPeerCount > 0) MeshBlue else Color(0xFF555555),
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(3.dp))
-            Text(
-                text = "$connectedPeerCount",
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                color = if (connectedPeerCount > 0) MeshBlue else Color(0xFF555555)
-            )
+        Spacer(Modifier.width(12.dp))
+
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .clickable { onMapClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Info, contentDescription = "Help/Map", tint = Color.Black, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -290,172 +275,122 @@ private fun SafeRelayHeader(
 @Composable
 fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: () -> Unit = {}) {
     val context = LocalContext.current
-    var lastAction by remember { mutableStateOf<String?>(null) }
-    var lastActionTime by remember { mutableStateOf(0L) }
-
-    LaunchedEffect(lastAction) {
-        if (lastAction != null) {
-            delay(4000)
-            lastAction = null
-        }
-    }
+    val connectedPeers by viewModel.connectedPeers.collectAsState(emptyList())
+    val peerNicknames by viewModel.peerNicknames.collectAsState(emptyMap())
+    var isSosActive by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBg)
+            .background(Color(0xFFF5F5F5))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App brand
-        Text(
-            "🛡️",
-            fontSize = 52.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "SafeRelay",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = SOSRed
-        )
-        Text(
-            "Decentralized Disaster Communication",
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            color = Color(0xFF666666),
-            textAlign = TextAlign.Center
-        )
-
+        // Greeting Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Hi, ${if (profile.fullName.isNotBlank()) profile.fullName else viewModel.myNickname}!",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.Black
+            )
+            
+            // Profile avatar right-aligned
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MeshBlue.copy(alpha = 0.2f))
+                    .clickable { onProfileClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (profile.fullName.isBlank()) "@" else profile.initials,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MeshBlue
+                )
+            }
+        }
+        
         Spacer(Modifier.height(32.dp))
 
-        // Profile greeting card
-        Card(
-            modifier = Modifier.fillMaxWidth().clickable { onProfileClick() },
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F0F)),
-            border = BorderStroke(0.5.dp, SOSRed.copy(alpha = 0.25f))
+        // Emergency Contacts Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(SOSRed.copy(alpha = 0.2f))
-                        .border(1.5.dp, SOSRed.copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (profile.fullName.isBlank()) "@" else profile.initials,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SOSRed
-                    )
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(
-                        text = if (profile.fullName.isNotBlank()) profile.fullName else "@${viewModel.myNickname}",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFFEEEEEE)
-                    )
-                    if (profile.bloodGroup.isNotBlank()) {
-                        Text(
-                            text = "🩸 ${profile.bloodGroup}",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF888888)
-                        )
-                    }
-                    if (profile.city.isNotBlank()) {
-                        Text(
-                            text = "📍 ${profile.city}${if (profile.state.isNotBlank()) ", ${profile.state}" else ""}",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF888888)
-                        )
-                    }
-                }
+            EmergencyContactButton("🚑", "Ambulance", Color(0xFFFFCCBC), Color.Black) {
+                 // Open dialer logic could go here
+            }
+            EmergencyContactButton("🚒", "Fire", Color(0xFFFFCDD2), Color.Black) {
+            }
+            EmergencyContactButton("👮", "Police", Color(0xFFBBDEFB), Color.Black) {
             }
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(48.dp))
 
-        // ── I'm Safe ──
-        Button(
-            onClick = {
-                val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
-                val geo = getLastLocation(context)
-                val msg = SafeRelayMessage(
-                    sender = viewModel.myNickname,
-                    content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE." +
-                        (geo?.let { "\n📍 ${String.format("%.4f", it.latitude)}, ${String.format("%.4f", it.longitude)}" } ?: ""),
-                    timestamp = Date(),
-                    emergencyType = EmergencyMessageType.SAFE_STATUS,
-                    priorityLevel = PriorityLevel.URGENT,
-                    geoLocation = geo
-                )
-                viewModel.sendEmergencyMessage(msg)
-                lastAction = "safe"
-            },
-            modifier = Modifier.fillMaxWidth().height(60.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = SafeGreen)
-        ) {
-            Text("✅  I'm SAFE", fontSize = 19.sp, fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace, color = Color.Black)
-        }
+        // Central SOS Button
+        GlowingSosButton(onSosTriggered = {
+            isSosActive = true
+            val geo = getLastLocation(context)
+            val bat = getBatteryPercent(context)
+            val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+            viewModel.sendEmergencyMessage(sos)
+            SosManager.triggerSosHaptic(context)
+        })
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(48.dp))
 
-        // ── SOS ──
-        SosHoldButtonLarge(
-            onSosTriggered = {
-                val geo = getLastLocation(context)
-                val bat = getBatteryPercent(context)
-                val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                viewModel.sendEmergencyMessage(sos)
-                SosManager.triggerSosHaptic(context)
-                lastAction = "sos"
-            }
+        // Overlapping Avatars
+        OverlappingAvatars(connectedPeers, peerNicknames)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Your SOS will be sent to ${connectedPeers.size} people",
+            fontSize = 14.sp,
+            color = Color.DarkGray
         )
 
-        // Feedback
-        AnimatedVisibility(
-            visible = lastAction != null,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut()
-        ) {
-            Spacer(Modifier.height(16.dp))
-        }
-        if (lastAction != null) {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = if (lastAction == "safe") "✅ Status broadcast to mesh network!" else "🆘 SOS broadcast! Stay calm, help is relaying.",
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                color = if (lastAction == "safe") SafeGreen else SOSRed,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
+        Spacer(Modifier.height(48.dp))
 
-        Spacer(Modifier.height(28.dp))
-
-        // Info cards
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            InfoCard(Modifier.weight(1f), "🚑", "108", "Ambulance", Color(0xFFFF9500))
-            InfoCard(Modifier.weight(1f), "🚒", "101", "Fire", SOSRed)
-            InfoCard(Modifier.weight(1f), "👮", "100", "Police", MeshBlue)
-        }
+        // Swipe slider at the bottom
+        SwipeToConfirmSlider(
+            isSosActive = isSosActive,
+            onSwipeComplete = {
+                if (!isSosActive) {
+                    // Trigger SOS
+                    isSosActive = true
+                    val geo = getLastLocation(context)
+                    val bat = getBatteryPercent(context)
+                    val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                    viewModel.sendEmergencyMessage(sos)
+                    SosManager.triggerSosHaptic(context)
+                } else {
+                    // Cancel SOS / Send I'm Safe
+                    isSosActive = false
+                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                    val geo = getLastLocation(context)
+                    val msg = SafeRelayMessage(
+                        sender = viewModel.myNickname,
+                        content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE." +
+                            (geo?.let { "\n📍 ${String.format("%.4f", it.latitude)}, ${String.format("%.4f", it.longitude)}" } ?: ""),
+                        timestamp = java.util.Date(),
+                        emergencyType = EmergencyMessageType.SAFE_STATUS,
+                        priorityLevel = PriorityLevel.URGENT,
+                        geoLocation = geo
+                    )
+                    viewModel.sendEmergencyMessage(msg)
+                }
+            }
+        )
+        
+        Spacer(Modifier.height(32.dp))
     }
 }
 
@@ -1011,4 +946,229 @@ fun getLastLocation(context: Context): GeoLocation? {
         }
         best?.let { GeoLocation(it.latitude, it.longitude) }
     } catch (_: Exception) { null }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// UI Components for Home Screen
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun EmergencyContactButton(
+    emoji: String,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(containerColor)
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(emoji, fontSize = 32.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF333333)
+        )
+    }
+}
+
+@Composable
+fun OverlappingAvatars(peers: List<String>, peerNicknames: Map<String, String>) {
+    val displayPeers = peers.take(4)
+    if (displayPeers.isEmpty()) {
+        Text("No nearby devices", fontSize = 13.sp, color = Color.Gray)
+        return
+    }
+    
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(contentAlignment = Alignment.CenterStart) {
+            displayPeers.forEachIndexed { index, peer ->
+                val initials = (peerNicknames[peer] ?: peer).take(2).uppercase()
+                Box(
+                    modifier = Modifier
+                        .padding(start = (index * 24).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE0E0E0))
+                        .border(2.dp, Color(0xFFF5F5F5), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(initials, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                }
+            }
+            if (peers.size > 4) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = (4 * 24).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFB300))
+                        .border(2.dp, Color(0xFFF5F5F5), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("+${peers.size - 4}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SwipeToConfirmSlider(
+    modifier: Modifier = Modifier,
+    isSosActive: Boolean,
+    onSwipeComplete: () -> Unit
+) {
+    val density = LocalDensity.current
+    val thumbSize = 56.dp
+    val thumbSizePx = with(density) { thumbSize.toPx() }
+    val offsetXState = remember { mutableStateOf<Float>(0f) }
+    val maxWidthPxState = remember { mutableStateOf<Float>(0f) }
+    
+    val text = if (isSosActive) "Swipe to cancel SOS" else "Swipe to launch SOS"
+    val containerColor = if (isSosActive) SafeGreen else Color.Black
+    val thumbColor = if (isSosActive) Color.White else Color.White
+    val contentColor = if (isSosActive) Color.White else Color.White
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .clip(RoundedCornerShape(36.dp))
+            .background(containerColor)
+            .onGloballyPositioned { maxWidthPxState.value = it.size.width.toFloat() },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // Text
+        Text(
+            text = text,
+            color = contentColor,
+            fontWeight = FontWeight.Medium,
+            fontSize = 16.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+        
+        // Draggable Thumb
+        Box(
+            modifier = Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(offsetXState.value.toInt(), 0) }
+                .padding(8.dp)
+                .size(thumbSize)
+                .clip(CircleShape)
+                .background(thumbColor)
+                .pointerInput(isSosActive) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val maxPx = maxWidthPxState.value
+                            if (maxPx > 0f && offsetXState.value > maxPx - thumbSizePx - 32f) { // threshold
+                                onSwipeComplete()
+                            }
+                            offsetXState.value = 0f
+                        }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        val newX: Float = offsetXState.value + dragAmount
+                        val maxPx: Float = maxWidthPxState.value
+                        val threshold: Float = maxPx - thumbSizePx - 16f
+                        if (newX >= 0f && newX <= threshold) {
+                            offsetXState.value = newX
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Color.Black
+            )
+        }
+    }
+}
+@Composable
+fun GlowingSosButton(onSosTriggered: () -> Unit) {
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "sos_glow")
+    
+    val scale1 by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.3f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "glow_scale_1"
+    )
+    
+    val scale2 by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.6f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(2000, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "glow_scale_2"
+    )
+
+    Box(
+        modifier = Modifier.size(240.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Outer glow 2
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .scale(scale2)
+                .clip(CircleShape)
+                .background(Color(0xFFE57373).copy(alpha = 0.15f))
+        )
+        // Outer glow 1
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .scale(scale1)
+                .clip(CircleShape)
+                .background(Color(0xFFEF5350).copy(alpha = 0.3f))
+        )
+        // Main button
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(CircleShape)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(Color(0xFFFF5252), Color(0xFFD32F2F))
+                    )
+                )
+                .clickable { onSosTriggered() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Filled.Wifi,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "SOS",
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
 }
