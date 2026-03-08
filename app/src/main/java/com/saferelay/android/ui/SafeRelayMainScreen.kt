@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -61,9 +62,9 @@ val MeshBlue   = Color(0xFF3A8FFF)
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     STATUS("Home", Icons.Filled.Home),
-    CHAT("Chat", Icons.Filled.Chat),
-    MAP("Map", Icons.Filled.Map),
-    NEARBY("Nearby", Icons.Filled.Wifi),
+    CHAT("ZChat", Icons.Filled.Chat),
+    MAP("Contacts", Icons.Filled.Contacts),
+    NEARBY("Profile", Icons.Filled.Person),
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -234,9 +235,9 @@ private fun SafeRelayHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "SafeRelay",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
+            text = "SafeZ",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
             color = Color.Black,
             modifier = Modifier.clickable { onBrandClick() }
         )
@@ -283,7 +284,6 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -318,7 +318,7 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             }
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.weight(0.5f))
 
         // Emergency Contacts Row
         Row(
@@ -334,10 +334,10 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             }
         }
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.weight(1f))
 
         // Central SOS Button
-        GlowingSosButton(onSosTriggered = {
+        ProfessionalSosButton(onSosTriggered = {
             isSosActive = true
             val geo = getLastLocation(context)
             val bat = getBatteryPercent(context)
@@ -346,7 +346,7 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             SosManager.triggerSosHaptic(context)
         })
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.weight(1f))
 
         // Overlapping Avatars
         OverlappingAvatars(connectedPeers, peerNicknames)
@@ -357,7 +357,7 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             color = Color.DarkGray
         )
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.weight(0.5f))
 
         // Swipe slider at the bottom
         SwipeToConfirmSlider(
@@ -1097,57 +1097,42 @@ fun SwipeToConfirmSlider(
     }
 }
 @Composable
-fun GlowingSosButton(onSosTriggered: () -> Unit) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "sos_glow")
-    
-    val scale1 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.3f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "glow_scale_1"
-    )
-    
-    val scale2 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.6f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(2000, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "glow_scale_2"
-    )
-
+fun ProfessionalSosButton(onSosTriggered: () -> Unit) {
     Box(
-        modifier = Modifier.size(240.dp),
+        modifier = Modifier.size(260.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Outer glow 2
+        // Static Outer Ring (Transparent/Soft)
         Box(
             modifier = Modifier
-                .size(140.dp)
-                .scale(scale2)
+                .size(240.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE57373).copy(alpha = 0.15f))
+                .background(Color(0xFFFF5252).copy(alpha = 0.05f))
+                .border(1.dp, Color(0xFFFF5252).copy(alpha = 0.1f), CircleShape)
         )
-        // Outer glow 1
+        
+        // Inner Subtle Glow
         Box(
             modifier = Modifier
-                .size(140.dp)
-                .scale(scale1)
+                .size(190.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFEF5350).copy(alpha = 0.3f))
+                .background(Color(0xFFFF5252).copy(alpha = 0.12f))
         )
-        // Main button
+
+        // Main Professional Button
         Box(
             modifier = Modifier
-                .size(140.dp)
+                .size(150.dp)
+                .shadow(
+                    elevation = 12.dp,
+                    shape = CircleShape,
+                    ambientColor = Color(0xFFFF2D55).copy(alpha = 0.5f),
+                    spotColor = Color(0xFFFF2D55)
+                )
                 .clip(CircleShape)
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(Color(0xFFFF5252), Color(0xFFD32F2F))
+                        colors = listOf(Color(0xFFFF5E3A), Color(0xFFFF2D55))
                     )
                 )
                 .clickable { onSosTriggered() },
@@ -1157,16 +1142,16 @@ fun GlowingSosButton(onSosTriggered: () -> Unit) {
                 Icon(
                     Icons.Filled.Wifi,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.size(32.dp)
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "SOS",
                     color = Color.White,
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.SansSerif
                 )
             }
         }
