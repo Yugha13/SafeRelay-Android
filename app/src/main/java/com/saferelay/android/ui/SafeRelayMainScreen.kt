@@ -564,6 +564,7 @@ fun StatusTab(
                     val msg = SafeRelayMessage(
                         sender = viewModel.myNickname,
                         content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                        type = SafeRelayMessageType.Message,
                         timestamp = java.util.Date(),
                         emergencyType = EmergencyMessageType.SAFE_STATUS,
                         priorityLevel = PriorityLevel.URGENT,
@@ -572,6 +573,31 @@ fun StatusTab(
                     viewModel.sendEmergencyMessage(msg)
                 }
             )
+        }
+
+        // --- Custom SOS FAB ---
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 24.dp)
+                .size(70.dp)
+                .shadow(12.dp, CircleShape)
+                .clickable {
+                    val geo = getLastLocation(context)
+                    val bat = getBatteryPercent(context)
+                    val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                    viewModel.sendEmergencyMessage(sos)
+                    SosManager.triggerSosHaptic(context)
+                },
+            shape = CircleShape,
+            color = SOSRed
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(24.dp).offset(y = 2.dp))
+                    Text("SOS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
         }
     }
 }
