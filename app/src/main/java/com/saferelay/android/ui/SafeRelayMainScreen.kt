@@ -312,6 +312,7 @@ fun StatusTab(
     onMapClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val userName = if (profile.fullName.isNotBlank()) profile.fullName.split(" ").first() else "User"
     val messages by viewModel.messages.collectAsState(emptyList())
     val connectedPeers by viewModel.connectedPeers.collectAsState(emptyList())
     
@@ -357,9 +358,33 @@ fun StatusTab(
         .sortedByDescending { it.timestamp }
 
     var showCancelSosDialog by remember { mutableStateOf(false) }
+    var showAlertSentDialog by remember { mutableStateOf(false) }
+    var showDuplicateSosDialog by remember { mutableStateOf(false) }
+    var isSendingSos by remember { mutableStateOf(false) }
     
-    val userName = if (profile.fullName.isNotBlank()) profile.fullName.split(" ").first() else "User"
-
+    // --- Real-time Location Fetching ---
+    var locationAddress by remember { mutableStateOf("Fetching location...") }
+    val geo = remember(messages) { getLastLocation(context) }
+    
+    LaunchedEffect(geo) {
+        if (geo != null) {
+            try {
+                val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                val addresses = geocoder.getFromLocation(geo.latitude, geo.longitude, 1)
+                if (addresses != null && addresses.isNotEmpty()) {
+                    val addr = addresses[0]
+                    val line1 = addr.getAddressLine(0) ?: "Unknown Street"
+                    locationAddress = line1
+                } else {
+                    locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
+                }
+            } catch (e: Exception) {
+                locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
+            }
+        } else {
+            locationAddress = "Location access required"
+        }
+    }
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFBFBFB))) {
         Column(
             modifier = Modifier
@@ -447,14 +472,6 @@ fun StatusTab(
 
             Spacer(Modifier.height(24.dp))
 
-            // --- My Active SOS Section (Restored/Refined) ---
-            if (myActiveSos != null) {
-                MyActiveSosCard(
-                    msg = myActiveSos,
-                    onCancelClick = { showCancelSosDialog = true }
-                )
-                Spacer(Modifier.height(24.dp))
-            }
 
             // --- Location Card ---
             Card(
@@ -480,10 +497,51 @@ fun StatusTab(
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Your current Location", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F2937))
-                        Text("181 Dutsinma-Malumfashi Road,", fontSize = 12.sp, color = Color(0xFF9CA3AF))
-                        Text("Dutsinma, Katsina", fontSize = 12.sp, color = Color(0xFF9CA3AF))
+                        Text(locationAddress, fontSize = 12.sp, color = Color(0xFF9CA3AF))
                     }
                     Icon(Icons.Filled.ChevronRight, null, tint = Color(0xFFD1D5DB))
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // --- My SOS Section (Relocated below Location) ---
+            if (myActiveSos != null) {
+                MyActiveSosCard(
+                    msg = myActiveSos,
+                    onCancelClick = { showCancelSosDialog = true }
+                )
+            } else {
+                // Empty state for MY SOS
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.dp, Color(0xFFF3F4F6))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Shield, null, tint = InfoGray, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text("No current SOS", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF6B7280))
+                        }
+                        TextButton(onClick = { /* View History */ }) {
+                            Text("View History", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MeshBlue)
+                        }
+                    }
                 }
             }
 
@@ -595,11 +653,19 @@ fun StatusTab(
                 .size(70.dp)
                 .shadow(12.dp, CircleShape)
                 .clickable {
-                    val geo = getLastLocation(context)
-                    val bat = getBatteryPercent(context)
-                    val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                    viewModel.sendEmergencyMessage(sos)
-                    SosManager.triggerSosHaptic(context)
+                    if (isSendingSos) return@clickable
+                    if (myActiveSos != null) {
+                        showDuplicateSosDialog = true
+                    } else {
+                        isSendingSos = true
+                        val currentGeo = getLastLocation(context)
+                        val bat = getBatteryPercent(context)
+                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
+                        viewModel.sendEmergencyMessage(sos)
+                        SosManager.triggerSosHaptic(context)
+                        showAlertSentDialog = true
+                        isSendingSos = false
+                    }
                 },
             shape = CircleShape,
             color = SOSRed
@@ -608,6 +674,99 @@ fun StatusTab(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(24.dp).offset(y = 2.dp))
                     Text("SOS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+        }
+
+        // --- Alert Sent Dialog ---
+        if (showAlertSentDialog) {
+            AlertSentDialog(onDismiss = { showAlertSentDialog = false })
+        }
+
+        // --- Duplicate SOS Dialog ---
+        if (showDuplicateSosDialog) {
+            AlertDialog(
+                onDismissRequest = { showDuplicateSosDialog = false },
+                title = { Text("Duplicate Alert?") },
+                text = { Text("SOS is already pushed and waiting for response, do you want to push again?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDuplicateSosDialog = false
+                        val currentGeo = getLastLocation(context)
+                        val bat = getBatteryPercent(context)
+                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
+                        viewModel.sendEmergencyMessage(sos)
+                        SosManager.triggerSosHaptic(context)
+                        showAlertSentDialog = true
+                    }) {
+                        Text("Push Again")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDuplicateSosDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun AlertSentDialog(onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.fillMaxWidth(0.85f)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFEF2F2),
+                    modifier = Modifier.size(100.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.SettingsInputAntenna, 
+                            null, 
+                            tint = SOSRed, 
+                            modifier = Modifier.size(50.dp)
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    text = "Alert Sent",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF111827)
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                Text(
+                    text = "The Neighbourhood is Being notified, stay strong",
+                    fontSize = 15.sp,
+                    color = Color(0xFF6B7280),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+                
+                Spacer(Modifier.height(32.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF111827))
+                ) {
+                    Text("Got it", fontWeight = FontWeight.Bold)
                 }
             }
         }
