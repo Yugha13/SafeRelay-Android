@@ -121,7 +121,14 @@ fun SafeRelayMainScreen(
                 .statusBarsPadding()   // ← fixes top spacing gap
         ) {
             // ── Header (Always visible) ────────────────
+            val headerTitle = when (selectedTab) {
+                SafeRelayTab.STATUS -> "SafeRelay"
+                SafeRelayTab.CHAT -> "Chat"
+                SafeRelayTab.MAP -> "Map"
+                SafeRelayTab.PROFILE -> "Profile"
+            }
             SafeRelayHeader(
+                title = headerTitle,
                 profile = profile,
                 connectedPeerCount = connectedPeers.size,
                 onMapClick = { showDisasterMap = true },
@@ -220,6 +227,7 @@ fun SafeRelayMainScreen(
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SafeRelayHeader(
+    title: String,
     profile: UserProfile,
     connectedPeerCount: Int,
     onMapClick: () -> Unit,
@@ -239,7 +247,7 @@ private fun SafeRelayHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "SafeRelay",
+                text = title,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF1A1A2E),
