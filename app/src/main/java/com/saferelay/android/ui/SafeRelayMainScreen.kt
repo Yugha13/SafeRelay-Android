@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.rememberScrollState
 import com.saferelay.android.model.*
 import com.saferelay.android.ui.SosManager.isSosAlert
 import com.saferelay.android.ui.theme.SafeRelayTheme
@@ -64,7 +66,7 @@ val MeshBlue   = Color(0xFF3A8FFF)
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     STATUS("Home", Icons.Filled.Home),
-    CHAT("Chat", Icons.Filled.Chat),
+    CHAT("Messages", Icons.Filled.Chat),
     MAP("Map", Icons.Filled.Map),
     PROFILE("Profile", Icons.Filled.Person),
 }
@@ -111,7 +113,7 @@ fun SafeRelayMainScreen(
     // Use statusBarsPadding + imePadding at root level
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF5F5F5)
+        color = Color(0xFFF8F9FA)
     ) {
         Column(
             modifier = Modifier
@@ -155,11 +157,11 @@ fun SafeRelayMainScreen(
 
             // ── Bottom Navigation (hidden when keyboard up in Chat) ──
             if (!(selectedTab == SafeRelayTab.CHAT && imeVisible)) {
-                HorizontalDivider(color = SOSRed.copy(alpha = 0.25f), thickness = 0.5.dp)
+                HorizontalDivider(color = Color(0xFFE5E7EB), thickness = 1.dp)
 
                 NavigationBar(
                     containerColor = Color.White,
-                    tonalElevation = 2.dp,
+                    tonalElevation = 4.dp,
                     modifier = Modifier.navigationBarsPadding()
                 ) {
                     SafeRelayTab.values().forEach { tab ->
@@ -171,7 +173,7 @@ fun SafeRelayMainScreen(
                                 Icon(
                                     tab.icon,
                                     contentDescription = tab.label,
-                                    tint = if (selected) SOSRed else Color(0xFF555555),
+                                    tint = if (selected) MeshBlue else Color(0xFF9CA3AF),
                                     modifier = Modifier.size(22.dp)
                                 )
                             },
@@ -179,12 +181,12 @@ fun SafeRelayMainScreen(
                                 Text(
                                     tab.label,
                                     fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = if (selected) SOSRed else Color(0xFF555555)
+                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                    color = if (selected) MeshBlue else Color(0xFF9CA3AF)
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = SOSRed.copy(alpha = 0.15f)
+                                indicatorColor = MeshBlue.copy(alpha = 0.1f)
                             )
                         )
                     }
@@ -226,46 +228,70 @@ private fun SafeRelayHeader(
     onProfileClick: () -> Unit,
     onBrandClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 24.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF8F9FA),
+        shadowElevation = 0.dp
     ) {
-        Text(
-            text = "SafeRelay",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.Black,
-            modifier = Modifier.clickable { onBrandClick() }
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .clickable { /* TBD handle notification click */ },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(androidx.compose.material.icons.Icons.Filled.Notifications, contentDescription = "Notifications", tint = Color.Black, modifier = Modifier.size(24.dp))
-        }
+            Text(
+                text = "SafeRelay",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A2E),
+                modifier = Modifier.clickable { onBrandClick() }
+            )
 
-        Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.weight(1f))
 
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .clickable { onMapClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(androidx.compose.material.icons.Icons.Filled.Info, contentDescription = "Help/Map", tint = Color.Black, modifier = Modifier.size(24.dp))
+            // Connection status indicator
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (connectedPeerCount > 0) Color(0xFFE8F5E9) else Color(0xFFF3F4F6)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (connectedPeerCount > 0) SafeGreen else InfoGray)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "$connectedPeerCount",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (connectedPeerCount > 0) Color(0xFF4CAF50) else Color(0xFF6B7280)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            IconButton(onClick = { /* TBD handle notification click */ }) {
+                Icon(
+                    Icons.Filled.Notifications,
+                    contentDescription = "Notifications",
+                    tint = Color(0xFF6B7280)
+                )
+            }
+
+            IconButton(onClick = onMapClick) {
+                Icon(
+                    Icons.Filled.Map,
+                    contentDescription = "Map",
+                    tint = Color(0xFF6B7280)
+                )
+            }
         }
     }
 }
@@ -280,101 +306,370 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
     val peerNicknames by viewModel.peerNicknames.collectAsState(emptyMap())
     var isSosActive by remember { mutableStateOf(false) }
 
-    // Dialog states for emergency contacts
     var emergencyContactType by remember { mutableStateOf<String?>(null) }
     var emergencyContactNumber by remember { mutableStateOf<String?>(null) }
     var showMessageInputForContact by remember { mutableStateOf<String?>(null) }
 
+    val batteryPercent = remember { getBatteryPercent(context) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .background(Color(0xFFF8F9FA))
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Greeting Row
+        // App Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Hi, ${if (profile.fullName.isNotBlank()) profile.fullName else viewModel.myNickname}!",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Normal,
-                color = Color.Black
+                text = "SafeRelay",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A2E)
             )
             
-            // Profile avatar right-aligned
-            Box(
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { /* Notifications */ }) {
+                    Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = Color(0xFF6B7280))
+                }
+                IconButton(onClick = onProfileClick) {
+                    Surface(
+                        shape = CircleShape,
+                        color = SOSRed.copy(alpha = 0.1f)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(36.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (profile.fullName.isBlank()) "?" else profile.initials,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SOSRed
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Greeting Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MeshBlue.copy(alpha = 0.2f))
-                    .clickable { onProfileClick() },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Hello!",
+                        fontSize = 14.sp,
+                        color = Color(0xFF6B7280)
+                    )
+                    Text(
+                        text = if (profile.fullName.isNotBlank()) profile.fullName else viewModel.myNickname,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1A1A2E)
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (connectedPeers.isNotEmpty()) SafeGreen else InfoGray)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "${connectedPeers.size} connected",
+                            fontSize = 12.sp,
+                            color = Color(0xFF6B7280)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Quick Stats
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.Wifi,
+                value = "${connectedPeers.size}",
+                label = "Network",
+                bgColor = Color(0xFFE8F5E9),
+                iconColor = Color(0xFF4CAF50)
+            )
+            QuickStatCard(
+                modifier = Modifier.weight(1f),
+                icon = if (batteryPercent > 20) Icons.Filled.BatteryFull else Icons.Filled.BatteryAlert,
+                value = "$batteryPercent%",
+                label = "Battery",
+                bgColor = if (batteryPercent > 20) Color(0xFFE8F5E9) else Color(0xFFFFF3E0),
+                iconColor = if (batteryPercent > 20) Color(0xFF4CAF50) else Color(0xFFFF9800)
+            )
+            QuickStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.Shield,
+                value = "Safe",
+                label = "Status",
+                bgColor = Color(0xFFE8F5E9),
+                iconColor = Color(0xFF4CAF50)
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Emergency Contacts
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
             ) {
                 Text(
-                    text = if (profile.fullName.isBlank()) "@" else profile.initials,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MeshBlue
+                    text = "Emergency Services",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1A1A2E)
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    EmergencyServiceButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.LocalHospital,
+                        label = "Ambulance",
+                        number = "108",
+                        bgColor = Color(0xFFFFEBEE),
+                        onClick = {
+                            emergencyContactType = "Ambulance"
+                            emergencyContactNumber = "108"
+                        }
+                    )
+                    EmergencyServiceButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.LocalFireDepartment,
+                        label = "Fire",
+                        number = "101",
+                        bgColor = Color(0xFFFFF3E0),
+                        onClick = {
+                            emergencyContactType = "Fire"
+                            emergencyContactNumber = "101"
+                        }
+                    )
+                    EmergencyServiceButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.LocalPolice,
+                        label = "Police",
+                        number = "100",
+                        bgColor = Color(0xFFE3F2FD),
+                        onClick = {
+                            emergencyContactType = "Police"
+                            emergencyContactNumber = "100"
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // SOS Button
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Emergency Alert",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF6B7280)
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // SOS Circle Button
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(
+                                    SOSRed.copy(alpha = 0.2f),
+                                    SOSRed.copy(alpha = 0.05f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clickable {
+                                isSosActive = true
+                                val geo = getLastLocation(context)
+                                val bat = getBatteryPercent(context)
+                                val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                                viewModel.sendEmergencyMessage(sos)
+                                SosManager.triggerSosHaptic(context)
+                            },
+                        shape = CircleShape,
+                        color = SOSRed,
+                        shadowElevation = 8.dp
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Filled.Warning,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = "SOS",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                Text(
+                    text = "Tap to broadcast emergency to all nearby devices",
+                    fontSize = 12.sp,
+                    color = Color(0xFF9CA3AF),
+                    textAlign = TextAlign.Center
                 )
             }
         }
-        
-        Spacer(Modifier.weight(0.5f))
 
-        // Emergency Contacts Row
-        Row(
+        Spacer(Modifier.height(24.dp))
+
+        // Connected Peers
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            EmergencyContactButton("🚑", "Ambulance", Color(0xFFFFCCBC), Color.Black) {
-                emergencyContactType = "Ambulance"
-                emergencyContactNumber = "108"
-            }
-            EmergencyContactButton("🚒", "Fire", Color(0xFFFFCDD2), Color.Black) {
-                emergencyContactType = "Fire"
-                emergencyContactNumber = "101"
-            }
-            EmergencyContactButton("👮", "Police", Color(0xFFBBDEFB), Color.Black) {
-                emergencyContactType = "Police"
-                emergencyContactNumber = "100"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Peer avatars
+                if (connectedPeers.isNotEmpty()) {
+                    Row {
+                        connectedPeers.take(4).forEachIndexed { index, peer ->
+                            val initials = (peerNicknames[peer] ?: peer).take(2).uppercase()
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = (-index * 8).dp)
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MeshBlue.copy(alpha = 0.15f))
+                                    .border(2.dp, Color.White, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initials,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeshBlue
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.SignalWifi0Bar,
+                        contentDescription = null,
+                        tint = InfoGray,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                
+                Spacer(Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (connectedPeers.isNotEmpty()) "${connectedPeers.size} Trusted ${if (connectedPeers.size == 1) "Peer" else "Peers"}" else "No Peers Connected",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1A1A2E)
+                    )
+                    Text(
+                        text = if (connectedPeers.isNotEmpty()) "Your SOS will reach them" else "Scanning for nearby devices",
+                        fontSize = 12.sp,
+                        color = Color(0xFF6B7280)
+                    )
+                }
+                
+                if (connectedPeers.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = SafeGreen.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            text = "Active",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = SafeGreen,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(20.dp))
 
-        // Central SOS Button
-        ProfessionalSosButton(onSosTriggered = {
-            isSosActive = true
-            val geo = getLastLocation(context)
-            val bat = getBatteryPercent(context)
-            val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-            viewModel.sendEmergencyMessage(sos)
-            SosManager.triggerSosHaptic(context)
-        })
-
-        Spacer(Modifier.weight(1f))
-
-        // Overlapping Avatars
-        OverlappingAvatars(connectedPeers, peerNicknames)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Your SOS will be sent to ${connectedPeers.size} people",
-            fontSize = 14.sp,
-            color = Color.DarkGray
-        )
-
-        Spacer(Modifier.weight(0.5f))
-
-        // Safety Action Button at the bottom
-        SafetyActionButton(
-            isSosActive = isSosActive,
+        // Check-in Button
+        Button(
             onClick = {
                 if (!isSosActive) {
-                    // Send a "Check-in" or safety broadcast
                     val geo = getLastLocation(context)
                     val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
                     val msg = SafeRelayMessage(
@@ -387,9 +682,8 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
                         geoLocation = geo
                     )
                     viewModel.sendEmergencyMessage(msg)
-                    android.widget.Toast.makeText(context, "Safety status shared!", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, "Safety check-in sent!", android.widget.Toast.LENGTH_SHORT).show()
                 } else {
-                    // Cancel SOS / Send I'm Safe
                     isSosActive = false
                     val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
                     val geo = getLastLocation(context)
@@ -404,10 +698,28 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
                     )
                     viewModel.sendEmergencyMessage(msg)
                 }
-            }
-        )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MeshBlue)
+        ) {
+            Icon(
+                imageVector = if (isSosActive) Icons.Filled.CheckCircle else Icons.Filled.Send,
+                contentDescription = null,
+                tint = Color.White
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = if (isSosActive) "I'm Safe Now" else "Send Safety Check-in",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(20.dp))
     }
 
     // Emergency Action Dialog (Call vs Message)
@@ -1163,6 +1475,92 @@ fun EmergencyMessageInputDialog(
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// New Light Mode UI Components
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun QuickStatCard(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    value: String,
+    label: String,
+    bgColor: Color,
+    iconColor: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = value,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A2E)
+            )
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = Color(0xFF6B7280)
+            )
+        }
+    }
+}
+
+@Composable
+fun EmergencyServiceButton(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    number: String,
+    bgColor: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.clickable { onClick() }
+    ) {
+        Surface(
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = bgColor
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFF1A1A2E),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF1A1A2E)
+        )
+        Text(
+            text = number,
+            fontSize = 10.sp,
+            color = Color(0xFF9CA3AF)
+        )
+    }
+}
+
 @Composable
 fun OverlappingAvatars(peers: List<String>, peerNicknames: Map<String, String>) {
     val displayPeers = peers.take(4)
@@ -1451,5 +1849,258 @@ fun ProfileMenuRow(
             
             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.LightGray)
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Modern UI Components
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun StatusInfoCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    subtitle: String,
+    icon: ImageVector,
+    iconTint: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = value,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernEmergencyButton(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 16.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernSosButton(onSosTriggered: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Outer glow ring
+            Box(
+                modifier = Modifier
+                    .size(190.dp)
+                    .clip(CircleShape)
+                    .background(SOSRed.copy(alpha = 0.08f))
+            )
+            
+            // Middle ring
+            Box(
+                modifier = Modifier
+                    .size(160.dp)
+                    .clip(CircleShape)
+                    .background(SOSRed.copy(alpha = 0.12f))
+            )
+            
+            // Main SOS button
+            Surface(
+                modifier = Modifier
+                    .size(130.dp)
+                    .clickable { onSosTriggered() },
+                shape = CircleShape,
+                color = SOSRed,
+                shadowElevation = 8.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "SOS",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(8.dp))
+        
+        Text(
+            text = "Tap to broadcast emergency alert",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun ModernPeerStatus(
+    connectedPeers: List<String>,
+    peerNicknames: Map<String, String>
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Animated peer indicators
+        if (connectedPeers.isNotEmpty()) {
+            connectedPeers.take(3).forEachIndexed { index, peer ->
+                val initials = (peerNicknames[peer] ?: peer).take(2).uppercase()
+                Box(
+                    modifier = Modifier
+                        .offset(x = (-index * 8).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MeshBlue.copy(alpha = 0.2f))
+                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = initials,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeshBlue
+                    )
+                }
+            }
+            
+            if (connectedPeers.size > 3) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = (-3 * 8).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(UrgentOrange)
+                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "+${connectedPeers.size - 3}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+            
+            Spacer(Modifier.width(12.dp))
+            
+            Text(
+                text = "${connectedPeers.size} trusted ${if (connectedPeers.size == 1) "peer" else "peers"} nearby",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.SignalWifi0Bar,
+                contentDescription = null,
+                tint = InfoGray,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "No peers connected",
+                fontSize = 14.sp,
+                color = InfoGray
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernSafetyButton(
+    isSosActive: Boolean,
+    onClick: () -> Unit
+) {
+    val containerColor = if (isSosActive) SafeGreen else MeshBlue
+    val text = if (isSosActive) "I'M SAFE NOW" else "CHECK IN SAFELY"
+    
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = containerColor),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+    ) {
+        Icon(
+            imageVector = if (isSosActive) Icons.Filled.CheckCircle else Icons.Filled.Shield,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
     }
 }
