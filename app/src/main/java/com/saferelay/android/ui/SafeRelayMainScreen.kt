@@ -66,8 +66,9 @@ val MeshBlue   = Color(0xFF3A8FFF)
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     HOME("Home", Icons.Filled.Home),
-    HISTORY("History", Icons.Filled.History),
-    SETTINGS("Settings", Icons.Filled.Settings),
+    CHAT("Messages", Icons.Filled.Chat),
+    MAP("Map", Icons.Filled.Map),
+    PROFILE("Profile", Icons.Filled.Person),
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -123,15 +124,16 @@ fun SafeRelayMainScreen(
             if (selectedTab != SafeRelayTab.HOME) {
                 val headerTitle = when (selectedTab) {
                     SafeRelayTab.HOME -> "SafeRelay"
-                    SafeRelayTab.HISTORY -> "History"
-                    SafeRelayTab.SETTINGS -> "Settings"
+                    SafeRelayTab.CHAT -> "Chat"
+                    SafeRelayTab.MAP -> "Map"
+                    SafeRelayTab.PROFILE -> "Profile"
                 }
                 SafeRelayHeader(
                     title = headerTitle,
                     profile = profile,
                     connectedPeerCount = connectedPeers.size,
                     onMapClick = { showDisasterMap = true },
-                    onProfileClick = { selectedTab = SafeRelayTab.SETTINGS }, // Profile now in settings?
+                    onProfileClick = { selectedTab = SafeRelayTab.PROFILE }, // Profile restored
                     onBrandClick = { selectedTab = SafeRelayTab.HOME }
                 )
             }
@@ -139,9 +141,19 @@ fun SafeRelayMainScreen(
             // ── Body ───────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
-                    SafeRelayTab.HOME -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { selectedTab = SafeRelayTab.SETTINGS })
-                    SafeRelayTab.HISTORY   -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("History Placeholder") }
-                    SafeRelayTab.SETTINGS -> ProfileTab(
+                    SafeRelayTab.HOME -> StatusTab(viewModel = viewModel, profile = profile, onProfileClick = { selectedTab = SafeRelayTab.PROFILE })
+                    SafeRelayTab.CHAT   -> SafeRelayTheme(darkTheme = false) {
+                        ChatScreen(viewModel = viewModel, embedded = true)
+                    }
+                    SafeRelayTab.MAP    -> DisasterMapTab(
+                        messages = messages,
+                        myNickname = viewModel.myNickname,
+                        peerNicknames = peerNicknames,
+                        onOpenChat = { pid: String, nick: String ->
+                            onOpenPrivateChat(pid, nick)
+                        }
+                    )
+                    SafeRelayTab.PROFILE -> ProfileTab(
                         viewModel = viewModel,
                         profile = profile,
                         profileManager = profileManager,
