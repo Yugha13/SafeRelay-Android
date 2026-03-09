@@ -292,6 +292,27 @@ private fun SafeRelayHeader(
                     tint = Color(0xFF6B7280)
                 )
             }
+
+            Spacer(Modifier.width(8.dp))
+
+            IconButton(onClick = onProfileClick) {
+                Surface(
+                    shape = CircleShape,
+                    color = SOSRed.copy(alpha = 0.1f)
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (profile.fullName.isBlank()) "?" else profile.initials,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SOSRed
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -320,45 +341,7 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "SafeRelay",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A2E)
-            )
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { /* Notifications */ }) {
-                    Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = Color(0xFF6B7280))
-                }
-                IconButton(onClick = onProfileClick) {
-                    Surface(
-                        shape = CircleShape,
-                        color = SOSRed.copy(alpha = 0.1f)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(36.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (profile.fullName.isBlank()) "?" else profile.initials,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SOSRed
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
+        // Spacer(Modifier.height(20.dp)) // Removed redundant header Row
 
         // Greeting Card
         Card(
