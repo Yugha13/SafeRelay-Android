@@ -138,6 +138,7 @@ fun SafeRelayMainScreen(
                     }
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
+                        myNickname = viewModel.myNickname,
                         peerNicknames = peerNicknames,
                         onOpenChat = { pid: String, nick: String ->
                             onOpenPrivateChat(pid, nick)
@@ -200,6 +201,7 @@ fun SafeRelayMainScreen(
     if (showDisasterMap) {
         DisasterMapSheet(
             messages = messages,
+            myNickname = viewModel.myNickname,
             peerNicknames = peerNicknames,
             onOpenChat = { pid: String, nick: String ->
                 showDisasterMap = false

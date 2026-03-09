@@ -71,13 +71,15 @@ import org.maplibre.compose.util.ClickResult
 @Composable
 fun DisasterMapTab(
     messages: List<SafeRelayMessage>,
+    myNickname: String,
     peerNicknames: Map<String, String> = emptyMap(),
     onOpenChat: (String, String) -> Unit = { _, _ -> }
 ) {
-    val sosMessages = remember(messages) {
+    val sosMessages = remember(messages, myNickname) {
         messages.filter {
-            (it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
-            it.priorityLevel == PriorityLevel.CRITICAL
+            it.sender != myNickname &&
+            ((it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
+            it.priorityLevel == PriorityLevel.CRITICAL)
         }
     }
     var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
@@ -123,12 +125,13 @@ fun DisasterMapTab(
 @Composable
 fun DisasterMapSheet(
     messages: List<SafeRelayMessage>,
+    myNickname: String,
     peerNicknames: Map<String, String> = emptyMap(),
     onOpenChat: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
-    val sosMessages = remember(messages) {
-        messages.filter { it.emergencyType == EmergencyMessageType.SOS || it.priorityLevel == PriorityLevel.CRITICAL }
+    val sosMessages = remember(messages, myNickname) {
+        messages.filter { it.sender != myNickname && (it.emergencyType == EmergencyMessageType.SOS || it.priorityLevel == PriorityLevel.CRITICAL) }
     }
     var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
