@@ -65,10 +65,9 @@ val MeshBlue   = Color(0xFF3A8FFF)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    HOME("Home", Icons.Filled.Home),
-    CHAT("Messages", Icons.Filled.Chat),
-    MAP("Map", Icons.Filled.Map),
-    PROFILE("Profile", Icons.Filled.Person),
+    HOME("Home", Icons.Default.Home),
+    HISTORY("History", Icons.Default.History),
+    SETTINGS("Settings", Icons.Default.Settings),
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -124,16 +123,15 @@ fun SafeRelayMainScreen(
             if (selectedTab != SafeRelayTab.HOME) {
                 val headerTitle = when (selectedTab) {
                     SafeRelayTab.HOME -> "SafeRelay"
-                    SafeRelayTab.CHAT -> "Chat"
-                    SafeRelayTab.MAP -> "Map"
-                    SafeRelayTab.PROFILE -> "Profile"
+                    SafeRelayTab.HISTORY -> "History"
+                    SafeRelayTab.SETTINGS -> "Settings"
                 }
                 SafeRelayHeader(
                     title = headerTitle,
                     profile = profile,
                     connectedPeerCount = connectedPeers.size,
                     onMapClick = { showDisasterMap = true },
-                    onProfileClick = { selectedTab = SafeRelayTab.PROFILE }, // Profile restored
+                    onProfileClick = { selectedTab = SafeRelayTab.SETTINGS }, // Profile restored
                     onBrandClick = { selectedTab = SafeRelayTab.HOME }
                 )
             }
@@ -144,21 +142,11 @@ fun SafeRelayMainScreen(
                     SafeRelayTab.HOME -> StatusTab(
                         viewModel = viewModel,
                         profile = profile,
-                        onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
+                        onProfileClick = { selectedTab = SafeRelayTab.SETTINGS },
                         onMapClick = { showDisasterMap = true }
                     )
-                    SafeRelayTab.CHAT   -> SafeRelayTheme(darkTheme = false) {
-                        ChatScreen(viewModel = viewModel, embedded = true)
-                    }
-                    SafeRelayTab.MAP    -> DisasterMapTab(
-                        messages = messages,
-                        myNickname = viewModel.myNickname,
-                        peerNicknames = peerNicknames,
-                        onOpenChat = { pid: String, nick: String ->
-                            onOpenPrivateChat(pid, nick)
-                        }
-                    )
-                    SafeRelayTab.PROFILE -> ProfileTab(
+                    SafeRelayTab.HISTORY   -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("History Placeholder") }
+                    SafeRelayTab.SETTINGS -> ProfileTab(
                         viewModel = viewModel,
                         profile = profile,
                         profileManager = profileManager,
@@ -318,6 +306,44 @@ fun StatusTab(
     val myActiveSos = messages.findLast { it.isSosAlert() && it.sender == viewModel.myNickname }
     val othersActiveSos = messages.filter { it.isSosAlert() && it.sender != viewModel.myNickname }
     
+    // Mock Data and Forget State
+    var forgottenIds by remember { mutableStateOf(setOf<String>()) }
+    val mockEmergencies = remember {
+        listOf(
+            SafeRelayMessage(
+                id = "m1", 
+                sender = "Mesh", 
+                content = "Armed robbery", 
+                type = SafeRelayMessageType.Message,
+                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
+                emergencyType = EmergencyMessageType.SOS, 
+                priorityLevel = PriorityLevel.CRITICAL
+            ),
+            SafeRelayMessage(
+                id = "m2", 
+                sender = "Mesh", 
+                content = "Break in", 
+                type = SafeRelayMessageType.Message,
+                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
+                emergencyType = EmergencyMessageType.SOS, 
+                priorityLevel = PriorityLevel.URGENT
+            ),
+            SafeRelayMessage(
+                id = "m3", 
+                sender = "Mesh", 
+                content = "Medical Emergency", 
+                type = SafeRelayMessageType.Message,
+                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
+                emergencyType = EmergencyMessageType.SOS, 
+                priorityLevel = PriorityLevel.INFO
+            )
+        )
+    }
+    
+    val displayEmergencies = (mockEmergencies + othersActiveSos)
+        .filter { it.id !in forgottenIds }
+        .sortedByDescending { it.timestamp }
+
     var showCancelSosDialog by remember { mutableStateOf(false) }
     
     val userName = if (profile.fullName.isNotBlank()) profile.fullName.split(" ").first() else "User"
@@ -462,8 +488,8 @@ fun StatusTab(
                 )
                 Spacer(Modifier.height(16.dp))
                 
-                if (othersActiveSos.isEmpty()) {
-                    // Empty state (only if no OTHERS have SOS)
+                if (displayEmergencies.isEmpty()) {
+                    // Empty state (only if no OTHERS/MOCK have SOS)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
@@ -516,9 +542,9 @@ fun StatusTab(
                         }
                     }
                 } else {
-                    // Active list for OTHERS only
-                    othersActiveSos.asReversed().forEach { msg ->
-                        EmergencyCard(msg)
+                    // Active list including mock data
+                    displayEmergencies.forEach { msg ->
+                        EmergencyCard(msg, onForget = { forgottenIds = forgottenIds + msg.id })
                         Spacer(Modifier.height(12.dp))
                     }
                 }
@@ -652,7 +678,14 @@ fun CancelSosDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 }
 
 @Composable
-fun EmergencyCard(msg: SafeRelayMessage) {
+fun EmergencyCard(msg: SafeRelayMessage, onForget: () -> Unit = {}) {
+    val (type, icon, color) = when {
+        msg.content.contains("Armed robbery", ignoreCase = true) -> Triple("Armed robbery", Icons.Default.Dining, SOSRed) // Close enough to knife
+        msg.content.contains("Break in", ignoreCase = true) -> Triple("Break in", Icons.Default.DoorSliding, UrgentOrange)
+        msg.content.contains("Medical Emergency", ignoreCase = true) -> Triple("Medical Emergency", Icons.Default.MedicalServices, Color(0xFF8B5CF6)) // Purple
+        else -> Triple("Security Alert", Icons.Default.Warning, SOSRed)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -664,11 +697,11 @@ fun EmergencyCard(msg: SafeRelayMessage) {
             Row(verticalAlignment = Alignment.Top) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = SOSRed.copy(alpha = 0.1f),
+                    color = color.copy(alpha = 0.1f),
                     modifier = Modifier.size(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Warning, null, tint = SOSRed, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
                     }
                 }
                 
@@ -681,13 +714,13 @@ fun EmergencyCard(msg: SafeRelayMessage) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Security Alert",
+                            text = type,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 18.sp,
                             color = Color(0xFF111827)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.AccessTime, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.AccessTime, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
                             Text(text = "2m ago", fontSize = 12.sp, color = Color(0xFF9CA3AF), fontWeight = FontWeight.Medium)
                         }
@@ -696,7 +729,7 @@ fun EmergencyCard(msg: SafeRelayMessage) {
                     Spacer(Modifier.height(6.dp))
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.LocationOn, null, tint = Color(0xFF6B7280), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.LocationOn, null, tint = Color(0xFF6B7280), modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = "Parliament Street - Block 5",
@@ -715,7 +748,7 @@ fun EmergencyCard(msg: SafeRelayMessage) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = { /* Forget */ },
+                    onClick = onForget,
                     modifier = Modifier.weight(1f).height(44.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, Color(0xFFE5E7EB))
