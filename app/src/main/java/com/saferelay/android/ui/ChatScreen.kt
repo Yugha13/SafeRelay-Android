@@ -122,16 +122,7 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
                 .windowInsetsPadding(WindowInsets.ime)
                 .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier)
         ) {
-            // Header spacer - creates exact space for the floating header (status bar + compact header)
-            if (!embedded) {
-                Spacer(
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .height(headerHeight)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(headerHeight))
-            }
+            // Spacer(modifier = Modifier.height(headerHeight)) // Removed for unified header
 
             // Messages area - takes up available space, will compress when keyboard appears
             MessagesList(
@@ -244,73 +235,17 @@ fun ChatScreen(viewModel: ChatViewModel, embedded: Boolean = false) {
             )
         }
 
-        // Floating header
+        /* // Removed local floating header
         if (embedded) {
-            // Simplified broadcast header for embedded chat
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(1f),
-                color = Color.White,
-                shadowElevation = 2.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(headerHeight)
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "SafeRelay/",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = SOSRed,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "@$nickname",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "👥 ${connectedPeers.size}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-            }
+            ...
         } else {
-            ChatFloatingHeader(
-                headerHeight = headerHeight,
-                embedded = false,
-                selectedPrivatePeer = null,
-                currentChannel = currentChannel,
-                nickname = nickname,
-                viewModel = viewModel,
-                colorScheme = colorScheme,
-                onSidebarToggle = { viewModel.showMeshPeerList() },
-                onShowAppInfo = { viewModel.showAppInfo() },
-                onPanicClear = { viewModel.panicClearAllData() },
-                onLocationChannelsClick = { showLocationChannelsSheet = true },
-                onLocationNotesClick = { showLocationNotesSheet = true }
-            )
+            ChatFloatingHeader(...)
         }
+        */
 
-        // Divider under header
-        HorizontalDivider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
-                .offset(y = headerHeight)
-                .zIndex(1f),
-            color = colorScheme.outline.copy(alpha = 0.3f)
-        )
+        /* // Removed local header divider
+        HorizontalDivider(...)
+        */
 
         // Scroll-to-bottom floating button
         AnimatedVisibility(

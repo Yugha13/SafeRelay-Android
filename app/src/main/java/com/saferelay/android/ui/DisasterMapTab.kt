@@ -91,7 +91,7 @@ fun DisasterMapTab(
             onMarkerClick = { selectedMessage = it }
         )
 
-        // SOS count badge
+        /* // Removed local SOS badge for unified header
         if (sosMessages.isNotEmpty()) {
             Box(
                 modifier = Modifier
@@ -105,6 +105,7 @@ fun DisasterMapTab(
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
             }
         }
+        */
         
         selectedMessage?.let { msg ->
             val senderId = msg.senderPeerID ?: msg.sender

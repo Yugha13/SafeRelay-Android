@@ -120,16 +120,14 @@ fun SafeRelayMainScreen(
                 .fillMaxSize()
                 .statusBarsPadding()   // ← fixes top spacing gap
         ) {
-            // ── Header (hidden when Chat tab is active) ────────────────
-            if (selectedTab != SafeRelayTab.CHAT) {
-                SafeRelayHeader(
-                    profile = profile,
-                    connectedPeerCount = connectedPeers.size,
-                    onMapClick = { showDisasterMap = true },
-                    onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
-                    onBrandClick = { selectedTab = SafeRelayTab.STATUS }
-                )
-            }
+            // ── Header (Always visible) ────────────────
+            SafeRelayHeader(
+                profile = profile,
+                connectedPeerCount = connectedPeers.size,
+                onMapClick = { showDisasterMap = true },
+                onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
+                onBrandClick = { selectedTab = SafeRelayTab.STATUS }
+            )
 
             // ── Body ───────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
