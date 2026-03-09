@@ -278,6 +278,11 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
     val peerNicknames by viewModel.peerNicknames.collectAsState(emptyMap())
     var isSosActive by remember { mutableStateOf(false) }
 
+    // Dialog states for emergency contacts
+    var emergencyContactType by remember { mutableStateOf<String?>(null) }
+    var emergencyContactNumber by remember { mutableStateOf<String?>(null) }
+    var showMessageInputForContact by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -324,11 +329,16 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             EmergencyContactButton("🚑", "Ambulance", Color(0xFFFFCCBC), Color.Black) {
-                 // Open dialer logic could go here
+                emergencyContactType = "Ambulance"
+                emergencyContactNumber = "108"
             }
             EmergencyContactButton("🚒", "Fire", Color(0xFFFFCDD2), Color.Black) {
+                emergencyContactType = "Fire"
+                emergencyContactNumber = "101"
             }
             EmergencyContactButton("👮", "Police", Color(0xFFBBDEFB), Color.Black) {
+                emergencyContactType = "Police"
+                emergencyContactNumber = "100"
             }
         }
 
@@ -396,6 +406,55 @@ fun StatusTab(viewModel: ChatViewModel, profile: UserProfile, onProfileClick: ()
         )
         
         Spacer(Modifier.height(32.dp))
+    }
+
+    // Emergency Action Dialog (Call vs Message)
+    if (emergencyContactType != null && emergencyContactNumber != null) {
+        EmergencyActionDialog(
+            contactType = emergencyContactType!!,
+            contactNumber = emergencyContactNumber!!,
+            onCall = { num ->
+                val intent = Intent(Intent.ACTION_DIAL).apply {
+                    data = android.net.Uri.parse("tel:$num")
+                }
+                context.startActivity(intent)
+                emergencyContactType = null
+                emergencyContactNumber = null
+            },
+            onMessage = { type ->
+                showMessageInputForContact = type
+                emergencyContactType = null
+                emergencyContactNumber = null
+            },
+            onDismiss = {
+                emergencyContactType = null
+                emergencyContactNumber = null
+            }
+        )
+    }
+
+    // Custom Emergency Message Input Dialog
+    if (showMessageInputForContact != null) {
+        EmergencyMessageInputDialog(
+            contactType = showMessageInputForContact!!,
+            onSend = { customMessage ->
+                val geo = getLastLocation(context)
+                val msg = SafeRelayMessage(
+                    sender = viewModel.myNickname,
+                    content = "🚨 $showMessageInputForContact REQUEST:\n$customMessage",
+                    timestamp = java.util.Date(),
+                    emergencyType = EmergencyMessageType.SOS,
+                    priorityLevel = PriorityLevel.CRITICAL,
+                    geoLocation = geo
+                )
+                viewModel.sendEmergencyMessage(msg)
+                android.widget.Toast.makeText(context, "$showMessageInputForContact request broadcasted to mesh!", android.widget.Toast.LENGTH_SHORT).show()
+                showMessageInputForContact = null
+            },
+            onDismiss = {
+                showMessageInputForContact = null
+            }
+        )
     }
 }
 
@@ -983,6 +1042,123 @@ fun EmergencyContactButton(
             color = Color(0xFF333333)
         )
     }
+}
+
+@Composable
+fun EmergencyActionDialog(
+    contactType: String,
+    contactNumber: String,
+    onCall: (String) -> Unit,
+    onMessage: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Contact $contactType",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Text(
+                "Do you want to Call $contactType or broadcast a custom Message to nearby devices?",
+                fontSize = 14.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCall(contactNumber) },
+                colors = ButtonDefaults.buttonColors(containerColor = SOSRed)
+            ) {
+                Icon(Icons.Filled.Call, contentDescription = "Call", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Call $contactNumber")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = { onMessage(contactType) },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SOSRed),
+                border = BorderStroke(1.dp, SOSRed)
+            ) {
+                Icon(Icons.Filled.Message, contentDescription = "Message", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Message")
+            }
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EmergencyMessageInputDialog(
+    contactType: String,
+    onSend: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var messageText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Request $contactType",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "Describe your emergency needs. This will be broadcasted to all nearby devices.",
+                    fontSize = 14.sp,
+                    color = Color.DarkGray
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("E.g., Need immediate medical help, severe bleeding...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = SOSRed,
+                        cursorColor = SOSRed
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (messageText.isNotBlank()) {
+                        onSend(messageText)
+                    }
+                },
+                enabled = messageText.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = SOSRed)
+            ) {
+                Icon(Icons.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Send Broadcast")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)
+            ) {
+                Text("Cancel")
+            }
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable
