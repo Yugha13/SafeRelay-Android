@@ -277,41 +277,12 @@ private fun SafeRelayHeader(
 
             Spacer(Modifier.width(12.dp))
 
-            IconButton(onClick = { /* TBD handle notification click */ }) {
-                Icon(
-                    Icons.Filled.Notifications,
-                    contentDescription = "Notifications",
-                    tint = Color(0xFF6B7280)
-                )
-            }
-
             IconButton(onClick = onMapClick) {
                 Icon(
                     Icons.Filled.Map,
                     contentDescription = "Map",
                     tint = Color(0xFF6B7280)
                 )
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            IconButton(onClick = onProfileClick) {
-                Surface(
-                    shape = CircleShape,
-                    color = SOSRed.copy(alpha = 0.1f)
-                ) {
-                    Box(
-                        modifier = Modifier.size(36.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (profile.fullName.isBlank()) "?" else profile.initials,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SOSRed
-                        )
-                    }
-                }
             }
         }
     }
