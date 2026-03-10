@@ -416,55 +416,38 @@ fun StatusTab(
                     fontFamily = FontFamily.SansSerif
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Nearby devices count chip (Restored)
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFFF3F4F6),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (connectedPeers.isNotEmpty()) SafeGreen else InfoGray)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "${connectedPeers.size} nearby",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4B5563)
-                            )
-                        }
-                    }
-                    
-                    Spacer(Modifier.width(8.dp))
-                    
-                    // Map button (Restored)
+                    // Map button (40dp consistent size)
                     IconButton(
                         onClick = onMapClick,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color(0xFFF3F4F6), CircleShape)
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Icon(
-                            Icons.Filled.Map,
-                            "Disaster Map",
-                            tint = MeshBlue,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.fillMaxSize()) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Filled.Map,
+                                    "Disaster Map",
+                                    tint = MeshBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(12.dp))
 
-                    IconButton(onClick = { /* Notifications */ }) {
-                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.size(40.dp)) {
+                    // Notifications button (40dp consistent size)
+                    IconButton(
+                        onClick = { /* Notifications */ },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.fillMaxSize()) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Notifications, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    Icons.Default.Notifications,
+                                    null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }
@@ -476,8 +459,7 @@ fun StatusTab(
             // --- Greeting and Avatar ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Hi, $userName!",
@@ -485,20 +467,6 @@ fun StatusTab(
                     color = Color.Black,
                     fontFamily = FontFamily.Monospace // Courier-style look
                 )
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFDBEAFE),
-                    modifier = Modifier.size(56.dp).clickable { onProfileClick() }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (userName.isNotEmpty()) userName.take(1).uppercase() else "U",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3B82F6)
-                        )
-                    }
-                }
             }
 
             Spacer(Modifier.height(48.dp))
