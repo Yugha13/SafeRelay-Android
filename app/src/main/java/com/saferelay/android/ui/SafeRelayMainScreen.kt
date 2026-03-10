@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -385,161 +386,41 @@ fun StatusTab(
             locationAddress = "Location access required"
         }
     }
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFBFBFB))) {
+    // --- StatusTab Layout Restoration ---
+    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- Custom Header ---
+            // --- Top Header (SafeRelay, Bell, Info) ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Profile/Greeting
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFFF3F4F6),
-                        modifier = Modifier.size(40.dp).clickable { onProfileClick() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Face, "Avatar", tint = Color(0xFF374151), modifier = Modifier.size(24.dp))
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        text = "Hi $userName",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1F2937)
-                    )
-                }
-                
-                // Peer Count and Map Button (Restored UX)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Peer count chip
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, Color(0xFFF3F4F6)),
-                        modifier = Modifier.height(36.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(if (connectedPeers.isNotEmpty()) SafeGreen else InfoGray)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "${connectedPeers.size} nearby",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF4B5563)
-                            )
-                        }
-                    }
-                    
-                    Spacer(Modifier.width(8.dp))
-                    
-                    // Map button
-                    IconButton(
-                        onClick = onMapClick,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color.White, CircleShape)
-                            .border(1.dp, Color(0xFFF3F4F6), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Filled.Map,
-                            "Disaster Map",
-                            tint = MeshBlue,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-
-            // --- Location Card ---
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable { /* Open detailed location */ },
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = BorderStroke(1.dp, Color(0xFFF3F4F6))
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFF9FAFB),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.LocationOn, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(24.dp))
-                        }
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Your current Location", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F2937))
-                        Text(locationAddress, fontSize = 12.sp, color = Color(0xFF9CA3AF))
-                    }
-                    Icon(Icons.Filled.ChevronRight, null, tint = Color(0xFFD1D5DB))
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            // --- My SOS Section (Relocated below Location) ---
-            if (myActiveSos != null) {
-                MyActiveSosCard(
-                    msg = myActiveSos,
-                    onCancelClick = { showCancelSosDialog = true }
+                Text(
+                    text = "SafeRelay",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    fontFamily = FontFamily.SansSerif
                 )
-            } else {
-                // Empty state for MY SOS
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = BorderStroke(1.dp, Color(0xFFF3F4F6))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color.White,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.Shield, null, tint = InfoGray, modifier = Modifier.size(18.dp))
-                                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { /* Notifications */ }) {
+                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.size(40.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Notifications, null, tint = Color.Black, modifier = Modifier.size(20.dp))
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Text("No current SOS", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF6B7280))
                         }
-                        TextButton(onClick = { /* View History */ }) {
-                            Text("View History", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MeshBlue)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = { /* Info */ }) {
+                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.size(40.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Info, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
@@ -547,88 +428,112 @@ fun StatusTab(
 
             Spacer(Modifier.height(32.dp))
 
-            // --- Active Emergencies Section ---
-            Column(modifier = Modifier.fillMaxWidth()) {
+            // --- Greeting and Avatar ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "Active Emergencies",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1F2937),
-                    modifier = Modifier.align(Alignment.Start)
+                    text = "Hi, $userName!",
+                    fontSize = 36.sp,
+                    color = Color.Black,
+                    fontFamily = FontFamily.Monospace // Courier-style look
                 )
-                Spacer(Modifier.height(16.dp))
-                
-                if (displayEmergencies.isEmpty()) {
-                    // Empty state (only if no OTHERS/MOCK have SOS)
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        border = BorderStroke(1.dp, Color(0xFFF3F4F6))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 40.dp).fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Custom Face Illustration
-                            Box(
-                                modifier = Modifier
-                                    .size(120.dp)
-                                    .background(Color(0xFFF9FAFB), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Canvas(modifier = Modifier.size(60.dp)) {
-                                    val strokeWidth = 2.dp.toPx()
-                                    // Rounded square box for face
-                                    drawRoundRect(
-                                        color = Color(0xFF6B7280),
-                                        topLeft = Offset(10.dp.toPx(), 10.dp.toPx()),
-                                        size = Size(40.dp.toPx(), 40.dp.toPx()),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
-                                        style = Stroke(width = strokeWidth)
-                                    )
-                                    // X X eyes using generic Line - mockup
-                                    drawLine(Color(0xFF6B7280), Offset(18.dp.toPx(), 22.dp.toPx()), Offset(24.dp.toPx(), 28.dp.toPx()), strokeWidth, StrokeCap.Round)
-                                    drawLine(Color(0xFF6B7280), Offset(24.dp.toPx(), 22.dp.toPx()), Offset(18.dp.toPx(), 28.dp.toPx()), strokeWidth, StrokeCap.Round)
-                                    drawLine(Color(0xFF6B7280), Offset(36.dp.toPx(), 22.dp.toPx()), Offset(42.dp.toPx(), 28.dp.toPx()), strokeWidth, StrokeCap.Round)
-                                    drawLine(Color(0xFF6B7280), Offset(42.dp.toPx(), 22.dp.toPx()), Offset(36.dp.toPx(), 28.dp.toPx()), strokeWidth, StrokeCap.Round)
-                                    // Smile
-                                    drawArc(
-                                        color = Color(0xFF6B7280),
-                                        startAngle = 10f,
-                                        sweepAngle = 160f,
-                                        useCenter = false,
-                                        topLeft = Offset(22.dp.toPx(), 32.dp.toPx()),
-                                        size = Size(16.dp.toPx(), 10.dp.toPx()),
-                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            Text("Its Amazing", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F2937))
-                            Spacer(Modifier.height(4.dp))
-                            Text("Looks like thier are no active emergencies", fontSize = 12.sp, color = Color(0xFF9CA3AF))
-                        }
-                    }
-                } else {
-                    // Active list including mock data
-                    displayEmergencies.forEach { msg ->
-                        EmergencyCard(msg, onForget = { forgottenIds = forgottenIds + msg.id })
-                        Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFDBEAFE),
+                    modifier = Modifier.size(56.dp).clickable { onProfileClick() }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (userName.isNotEmpty()) userName.take(1).uppercase() else "U",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF3B82F6)
+                        )
                     }
                 }
             }
-            
-            Spacer(Modifier.height(80.dp)) // Space for FAB
-        }
 
-        // --- Cancel SOS Dialog ---
-        if (showCancelSosDialog) {
-            CancelSosDialog(
-                onDismiss = { showCancelSosDialog = false },
-                onConfirm = {
-                    showCancelSosDialog = false
+            Spacer(Modifier.height(48.dp))
+
+            // --- Quick Actions (Ambulance, Fire, Police) ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                QuickActionItem("Ambulance", "🚑", Color(0xFFFFEDEB))
+                QuickActionItem("Fire", "🚒", Color(0xFFFFE4E6))
+                QuickActionItem("Police", "👮", Color(0xFFDBEAFE))
+            }
+
+            Spacer(Modifier.height(60.dp))
+
+            // --- Central SOS Button with Ripples ---
+            Box(contentAlignment = Alignment.Center) {
+                // Outer soft ripple
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFFE4E6).copy(alpha = 0.3f),
+                    modifier = Modifier.size(280.dp)
+                ) {}
+                // Inner soft ripple
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFFE4E6).copy(alpha = 0.6f),
+                    modifier = Modifier.size(220.dp)
+                ) {}
+                // Main SOS Button
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    modifier = Modifier
+                        .size(160.dp)
+                        .shadow(10.dp, CircleShape)
+                        .clickable {
+                            if (isSendingSos) return@clickable
+                            isSendingSos = true
+                            val currentGeo = getLastLocation(context)
+                            val bat = getBatteryPercent(context)
+                            val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
+                            viewModel.sendEmergencyMessage(sos)
+                            SosManager.triggerSosHaptic(context)
+                            showAlertSentDialog = true
+                            isSendingSos = false
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFFFF4D4D), Color(0xFFFF2D55))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.height(4.dp))
+                            Text("SOS", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(48.dp))
+
+            // --- Status Text ---
+            Text("No nearby devices", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.height(8.dp))
+            Text("Your SOS will be sent to 0 people", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
+
+            Spacer(Modifier.weight(1f))
+
+            // --- Share Safety Status Button ---
+            Button(
+                onClick = {
                     val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
                     val geo = getLastLocation(context)
                     val msg = SafeRelayMessage(
@@ -641,74 +546,58 @@ fun StatusTab(
                         geoLocation = geo
                     )
                     viewModel.sendEmergencyMessage(msg)
-                }
-            )
-        }
-
-        // --- Custom SOS FAB ---
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 24.dp, bottom = 24.dp)
-                .size(70.dp)
-                .shadow(12.dp, CircleShape)
-                .clickable {
-                    if (isSendingSos) return@clickable
-                    if (myActiveSos != null) {
-                        showDuplicateSosDialog = true
-                    } else {
-                        isSendingSos = true
-                        val currentGeo = getLastLocation(context)
-                        val bat = getBatteryPercent(context)
-                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
-                        viewModel.sendEmergencyMessage(sos)
-                        SosManager.triggerSosHaptic(context)
-                        showAlertSentDialog = true
-                        isSendingSos = false
-                    }
                 },
-            shape = CircleShape,
-            color = SOSRed
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(24.dp).offset(y = 2.dp))
-                    Text("SOS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .shadow(8.dp, RoundedCornerShape(32.dp)),
+                shape = RoundedCornerShape(32.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF22C55E),
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "SHARE SAFETY STATUS",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
+            Spacer(Modifier.height(20.dp))
         }
 
         // --- Alert Sent Dialog ---
         if (showAlertSentDialog) {
             AlertSentDialog(onDismiss = { showAlertSentDialog = false })
         }
+    }
+}
 
-        // --- Duplicate SOS Dialog ---
-        if (showDuplicateSosDialog) {
-            AlertDialog(
-                onDismissRequest = { showDuplicateSosDialog = false },
-                title = { Text("Duplicate Alert?") },
-                text = { Text("SOS is already pushed and waiting for response, do you want to push again?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showDuplicateSosDialog = false
-                        val currentGeo = getLastLocation(context)
-                        val bat = getBatteryPercent(context)
-                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
-                        viewModel.sendEmergencyMessage(sos)
-                        SosManager.triggerSosHaptic(context)
-                        showAlertSentDialog = true
-                    }) {
-                        Text("Push Again")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDuplicateSosDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
+@Composable
+fun QuickActionItem(label: String, emoji: String, bgColor: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            shape = CircleShape,
+            color = bgColor,
+            modifier = Modifier.size(72.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(emoji, fontSize = 32.sp)
+            }
         }
+        Spacer(Modifier.height(8.dp))
+        Text(label, fontSize = 14.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
     }
 }
 
