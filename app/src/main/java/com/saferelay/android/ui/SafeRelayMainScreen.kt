@@ -183,23 +183,31 @@ fun SafeRelayMainScreen(
                             selected = selected,
                             onClick = { selectedTab = tab },
                             icon = {
-                                Icon(
-                                    tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = if (selected) MeshBlue else Color(0xFF9CA3AF),
-                                    modifier = Modifier.size(22.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp, 32.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (selected) MeshBlue.copy(alpha = 0.1f) else Color.Transparent),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = if (selected) MeshBlue else Color(0xFF9CA3AF),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
                             },
                             label = {
                                 Text(
                                     tab.label,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (selected) MeshBlue else Color(0xFF9CA3AF)
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = MeshBlue.copy(alpha = 0.1f)
+                                indicatorColor = Color.Transparent
                             )
                         )
                     }
@@ -493,14 +501,18 @@ fun StatusTab(
                         .shadow(10.dp, CircleShape)
                         .clickable {
                             if (isSendingSos) return@clickable
-                            isSendingSos = true
-                            val currentGeo = getLastLocation(context)
-                            val bat = getBatteryPercent(context)
-                            val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
-                            viewModel.sendEmergencyMessage(sos)
-                            SosManager.triggerSosHaptic(context)
-                            showAlertSentDialog = true
-                            isSendingSos = false
+                            if (myActiveSos != null) {
+                                showDuplicateSosDialog = true
+                            } else {
+                                isSendingSos = true
+                                val currentGeo = getLastLocation(context)
+                                val bat = getBatteryPercent(context)
+                                val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
+                                viewModel.sendEmergencyMessage(sos)
+                                SosManager.triggerSosHaptic(context)
+                                showAlertSentDialog = true
+                                isSendingSos = false
+                            }
                         }
                 ) {
                     Box(
@@ -531,42 +543,54 @@ fun StatusTab(
 
             Spacer(Modifier.weight(1f))
 
-            // --- Share Safety Status Button ---
+            // --- SHARE SAFETY STATUS (Conditional based on SOS) ---
+            val isSosActive = myActiveSos != null
             Button(
                 onClick = {
-                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
-                    val geo = getLastLocation(context)
-                    val msg = SafeRelayMessage(
-                        sender = viewModel.myNickname,
-                        content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
-                        type = SafeRelayMessageType.Message,
-                        timestamp = java.util.Date(),
-                        emergencyType = EmergencyMessageType.SAFE_STATUS,
-                        priorityLevel = PriorityLevel.URGENT,
-                        geoLocation = geo
-                    )
-                    viewModel.sendEmergencyMessage(msg)
+                    if (isSosActive) {
+                        showCancelSosDialog = true
+                    } else {
+                        val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                        val geo = getLastLocation(context)
+                        val msg = SafeRelayMessage(
+                            sender = viewModel.myNickname,
+                            content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                            type = SafeRelayMessageType.Message,
+                            timestamp = java.util.Date(),
+                            emergencyType = EmergencyMessageType.SAFE_STATUS,
+                            priorityLevel = PriorityLevel.URGENT,
+                            geoLocation = geo
+                        )
+                        viewModel.sendEmergencyMessage(msg)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .shadow(8.dp, RoundedCornerShape(32.dp)),
                 shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isSosActive) SOSRed else Color.Black
+                )
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF22C55E),
+                        color = if (isSosActive) Color.White else Color(0xFF22C55E),
                         modifier = Modifier.size(24.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            Icon(
+                                if (isSosActive) Icons.Default.Close else Icons.Default.Check,
+                                null,
+                                tint = if (isSosActive) SOSRed else Color.Black,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "SHARE SAFETY STATUS",
+                        if (isSosActive) "I'M SAFE NOW / CANCEL SOS" else "SHARE SAFETY STATUS",
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -580,6 +604,55 @@ fun StatusTab(
         // --- Alert Sent Dialog ---
         if (showAlertSentDialog) {
             AlertSentDialog(onDismiss = { showAlertSentDialog = false })
+        }
+
+        // --- Duplicate SOS Dialog ---
+        if (showDuplicateSosDialog) {
+            AlertDialog(
+                onDismissRequest = { showDuplicateSosDialog = false },
+                title = { Text("Duplicate Alert?") },
+                text = { Text("SOS is already pushed and waiting for response, do you want to push again?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDuplicateSosDialog = false
+                        val currentGeo = getLastLocation(context)
+                        val bat = getBatteryPercent(context)
+                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
+                        viewModel.sendEmergencyMessage(sos)
+                        SosManager.triggerSosHaptic(context)
+                        showAlertSentDialog = true
+                    }) {
+                        Text("Push Again")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDuplicateSosDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // --- Cancel SOS Dialog ---
+        if (showCancelSosDialog) {
+            CancelSosDialog(
+                onDismiss = { showCancelSosDialog = false },
+                onConfirm = {
+                    showCancelSosDialog = false
+                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                    val geo = getLastLocation(context)
+                    val msg = SafeRelayMessage(
+                        sender = viewModel.myNickname,
+                        content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                        type = SafeRelayMessageType.Message,
+                        timestamp = java.util.Date(),
+                        emergencyType = EmergencyMessageType.SAFE_STATUS,
+                        priorityLevel = PriorityLevel.URGENT,
+                        geoLocation = geo
+                    )
+                    viewModel.sendEmergencyMessage(msg)
+                }
+            )
         }
     }
 }
