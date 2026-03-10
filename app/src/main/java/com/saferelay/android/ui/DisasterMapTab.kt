@@ -73,13 +73,16 @@ fun DisasterMapTab(
     messages: List<SafeRelayMessage>,
     myNickname: String,
     peerNicknames: Map<String, String> = emptyMap(),
-    onOpenChat: (String, String) -> Unit = { _, _ -> }
+    onOpenChat: (String, String) -> Unit = { _, _ -> },
+    isPickingLocation: Boolean = false,
+    onLocationPicked: (com.saferelay.android.model.GeoLocation) -> Unit = {}
 ) {
     val sosMessages = remember(messages, myNickname) {
         messages.filter {
-            it.sender != myNickname &&
-            ((it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
-            it.priorityLevel == PriorityLevel.CRITICAL)
+            // Include SOS, Reports, and Admin Disasters
+            (it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
+            it.priorityLevel == PriorityLevel.CRITICAL ||
+            it.content.contains("🚨 [") // Basic check for my custom reports
         }
     }
     var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
@@ -88,7 +91,9 @@ fun DisasterMapTab(
         SOSMarkerMap(
             sosMessages = sosMessages,
             modifier = Modifier.fillMaxSize(),
-            onMarkerClick = { selectedMessage = it }
+            onMarkerClick = { selectedMessage = it },
+            isPickingLocation = isPickingLocation,
+            onLocationPicked = onLocationPicked
         )
 
         /* // Removed local SOS badge for unified header
@@ -202,7 +207,9 @@ fun DisasterMapSheet(
 fun SOSMarkerMap(
     sosMessages: List<SafeRelayMessage>,
     modifier: Modifier = Modifier,
-    onMarkerClick: (SafeRelayMessage) -> Unit
+    onMarkerClick: (SafeRelayMessage) -> Unit,
+    isPickingLocation: Boolean = false,
+    onLocationPicked: (com.saferelay.android.model.GeoLocation) -> Unit = {}
 ) {
     val context = LocalContext.current
     val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
@@ -248,7 +255,13 @@ fun SOSMarkerMap(
             modifier = Modifier.fillMaxSize(),
             cameraState = cameraState,
             baseStyle = BaseStyle.Uri(styleUri),
-            options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled)
+            options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled),
+            onMapClick = { geoPoint, _ ->
+                if (isPickingLocation) {
+                    onLocationPicked(com.saferelay.android.model.GeoLocation(geoPoint.latitude, geoPoint.longitude))
+                }
+                org.maplibre.compose.util.ClickResult.Consume
+            }
         ) {
             // 1. Native My Location Puck
             LocationPuck(
@@ -260,23 +273,30 @@ fun SOSMarkerMap(
                     accuracyFillColor = com.saferelay.android.ui.MeshBlue.copy(alpha = 0.3f),
                     accuracyStrokeColor = com.saferelay.android.ui.MeshBlue
                 ),
-                onClick = {
+                onClick = { event ->
                     coroutineScope.launch {
                         cameraState.animateTo(
-                            finalPosition = CameraPosition(target = it.position, zoom = 14.0)
+                            finalPosition = CameraPosition(target = event.position, zoom = 14.0)
                         )
                     }
                 }
             )
 
-            // 2. Native SOS Markers
+            // 2. Native SOS / Report / Disaster Markers
             if (sosMessages.isNotEmpty()) {
                 val features = sosMessages.mapNotNull { msg ->
                     msg.geoLocation?.let { geo ->
+                        val emoji = if (msg.content.contains("Armed Robbery")) "🔪"
+                                   else if (msg.content.contains("Fire Outbreak")) "🔥"
+                                   else if (msg.content.contains("Break in")) "🚪"
+                                   else if (msg.content.contains("Medical Emergency")) "🚑"
+                                   else if (msg.content.contains("Suspicious Activity")) "👁️"
+                                   else msg.emergencyType.emoji
+
                         Feature(
                             geometry = Point(longitude = geo.longitude, latitude = geo.latitude),
                             properties = buildJsonObject {
-                                put("emoji", JsonPrimitive(msg.emergencyType.emoji))
+                                put("emoji", JsonPrimitive(emoji))
                                 put("id", JsonPrimitive(msg.id))
                             }
                         )
@@ -291,22 +311,52 @@ fun SOSMarkerMap(
                     id = "sos-markers",
                     source = source,
                     textField = format(span(feature["emoji"].asString())),
-                    textSize = const(2f.em),
+                    textSize = const(2.2f.em),
                     onClick = { clickedFeatures ->
-                        val props = clickedFeatures.firstOrNull()?.properties?.let { 
-                            if (it is kotlinx.serialization.json.JsonObject) it else null 
+                        if (isPickingLocation) {
+                            ClickResult.Pass
+                        } else {
+                            val props = clickedFeatures.firstOrNull()?.properties?.let { 
+                                if (it is kotlinx.serialization.json.JsonObject) it else null 
+                            }
+                            
+                            val clickedId = props?.get("id")?.toString()?.trim('"')
+                                         
+                            if (clickedId != null) {
+                                val msg = sosMessages.find { it.id == clickedId }
+                                if (msg != null) onMarkerClick(msg)
+                            }
+                            ClickResult.Consume
                         }
-                        
-                        val clickedId = props?.get("id")?.toString()?.trim('"')
-                                     
-                        if (clickedId != null) {
-                            val msg = sosMessages.find { it.id == clickedId }
-                            if (msg != null) onMarkerClick(msg)
-                        }
-                        ClickResult.Consume
                     }
                 )
             }
+        }
+
+        // Picking location overlay
+        if (isPickingLocation) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 80.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    "Tap on map to select incident location",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            // Center crosshair
+            Icon(
+                Icons.Default.MyLocation,
+                null,
+                tint = SOSRed,
+                modifier = Modifier.align(Alignment.Center).size(32.dp)
+            )
         }
         
         // My Location Button

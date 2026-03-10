@@ -16,6 +16,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -59,11 +62,27 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 // ── Colour constants ───────────────────────────────────────────────────────
 val SOSRed     = Color(0xFFFF3B30)
 val UrgentOrange = Color(0xFFFF9500)
-val SafeGreen  = Color(0xFF30D158)
-val InfoGray   = Color(0xFF8E8E93)
-val DarkBg     = Color(0xFF000000)
-val CardBg     = Color(0xFF111111)
-val MeshBlue   = Color(0xFF3A8FFF)
+val SafeGreen    = Color(0xFF34C759)
+val InfoGray     = Color(0xFF8E8E93)
+val MeshBlue     = Color(0xFF007AFF)
+val DarkBg       = Color(0xFF0D0D0D)
+val CardBg       = Color(0xFF1C1C1E)
+
+data class EmergencyCategory(
+    val title: String,
+    val emoji: String,
+    val color: Color,
+    val description: String = ""
+)
+
+val EmergencyCategories = listOf(
+    EmergencyCategory("Armed Robbery", "🔪", Color(0xFFFF3B30)),
+    EmergencyCategory("Break in", "🚪", Color(0xFFFF9500)),
+    EmergencyCategory("Fire Outbreak", "🔥", Color(0xFFFFCC00)),
+    EmergencyCategory("Medical Emergency", "🚑", Color(0xFF34C759)),
+    EmergencyCategory("Suspicious Activity", "👁️", Color(0xFF5856D6)),
+    EmergencyCategory("Other Emergency", "🔔", Color(0xFF007AFF))
+)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -96,6 +115,14 @@ fun SafeRelayMainScreen(
     var showProfile by remember { mutableStateOf(false) }
     var showIncomingSosAlert by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
+    // --- Reporting Flow State ---
+    var showReportCategorySheet by remember { mutableStateOf(false) }
+    var showReportDetailsScreen by remember { mutableStateOf(false) }
+    var selectedReportCategory by remember { mutableStateOf<EmergencyCategory?>(null) }
+    var reportLocation by remember { mutableStateOf<GeoLocation?>(null) }
+    var isPickingLocationFromMap by remember { mutableStateOf(false) }
+    var locationAddress by remember { mutableStateOf("Fetching location...") }
+
     // Sync profile name → chat nickname
     LaunchedEffect(profile.fullName) {
         if (profile.fullName.isNotBlank()) {
@@ -104,6 +131,28 @@ fun SafeRelayMainScreen(
     }
 
     // Watch for incoming SOS
+    val geo = remember(messages) { getLastLocation(context) }
+    
+    LaunchedEffect(geo) {
+        if (geo != null) {
+            try {
+                val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                val addresses = geocoder.getFromLocation(geo.latitude, geo.longitude, 1)
+                if (addresses != null && addresses.isNotEmpty()) {
+                    val addr = addresses[0]
+                    val line1 = addr.getAddressLine(0) ?: "Unknown Street"
+                    locationAddress = line1
+                } else {
+                    locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
+                }
+            } catch (e: Exception) {
+                locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
+            }
+        } else {
+            locationAddress = "Location access required"
+        }
+    }
+
     LaunchedEffect(messages) {
         val latestSos = messages.lastOrNull { it.isSosAlert() && it.sender != viewModel.myNickname }
         if (latestSos != null && showIncomingSosAlert?.id != latestSos.id) {
@@ -147,7 +196,8 @@ fun SafeRelayMainScreen(
                         viewModel = viewModel,
                         profile = profile,
                         onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
-                        onMapClick = { showDisasterMap = true }
+                        onMapClick = { showDisasterMap = true },
+                        onReportClick = { showReportCategorySheet = true }
                     )
                     SafeRelayTab.CHAT   -> SafeRelayTheme(darkTheme = false) {
                         ChatScreen(viewModel = viewModel, embedded = true)
@@ -158,14 +208,24 @@ fun SafeRelayMainScreen(
                         peerNicknames = peerNicknames,
                         onOpenChat = { pid: String, nick: String ->
                             onOpenPrivateChat(pid, nick)
+                        },
+                        isPickingLocation = isPickingLocationFromMap,
+                        onLocationPicked = { geo ->
+                            reportLocation = geo
+                            isPickingLocationFromMap = false
+                            showReportDetailsScreen = true
+                            selectedTab = SafeRelayTab.HOME // Go back to Home where details screen is shown as overlay
                         }
                     )
-                    SafeRelayTab.PROFILE -> ProfileTab(
-                        viewModel = viewModel,
-                        profile = profile,
-                        profileManager = profileManager,
-                        onEditProfile = { showProfile = true }
-                    )
+                    SafeRelayTab.PROFILE -> {
+                        ProfileTab(
+                            viewModel = viewModel,
+                            profile = profile,
+                            profileManager = profileManager,
+                            onEditProfile = { showProfile = true },
+                            onReportClick = { showReportCategorySheet = true }
+                        )
+                    }
                 }
             }
 
@@ -236,6 +296,50 @@ fun SafeRelayMainScreen(
     }
     if (showProfile) {
         UserProfileSheet(profileManager = profileManager, onDismiss = { showProfile = false })
+    }
+
+    // --- Reporting Flow Overlays ---
+    if (showReportCategorySheet) {
+        ReportEmergencySheet(
+            onCategorySelected = { cat ->
+                selectedReportCategory = cat
+                showReportCategorySheet = false
+                showReportDetailsScreen = true
+                reportLocation = getLastLocation(context)
+            },
+            onDismiss = { showReportCategorySheet = false }
+        )
+    }
+
+    if (showReportDetailsScreen) {
+        EmergencyDetailsScreen(
+            category = selectedReportCategory ?: EmergencyCategories.first(),
+            locationAddress = locationAddress,
+            onBack = {
+                showReportDetailsScreen = false
+                showReportCategorySheet = true
+            },
+            onPickLocation = {
+                showReportDetailsScreen = false
+                isPickingLocationFromMap = true
+                selectedTab = SafeRelayTab.MAP
+            },
+            onSend = { info ->
+                val cat = selectedReportCategory ?: EmergencyCategories.first()
+                val msg = SafeRelayMessage(
+                    sender = viewModel.myNickname,
+                    content = "🚨 [${cat.title}]: $info",
+                    type = SafeRelayMessageType.Message,
+                    timestamp = java.util.Date(),
+                    emergencyType = EmergencyMessageType.NORMAL,
+                    priorityLevel = PriorityLevel.URGENT,
+                    geoLocation = reportLocation
+                )
+                viewModel.sendEmergencyMessage(msg)
+                showReportDetailsScreen = false
+                android.widget.Toast.makeText(context, "Emergency Alert Sent via Mesh!", android.widget.Toast.LENGTH_LONG).show()
+            }
+        )
     }
 }
 
@@ -319,7 +423,8 @@ fun StatusTab(
     viewModel: ChatViewModel,
     profile: UserProfile,
     onProfileClick: () -> Unit = {},
-    onMapClick: () -> Unit = {}
+    onMapClick: () -> Unit = {},
+    onReportClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val userName = if (profile.fullName.isNotBlank()) profile.fullName.split(" ").first() else "User"
@@ -384,29 +489,6 @@ fun StatusTab(
     var selectedEmergencyService by remember { mutableStateOf("") }
     var quickMessageText by remember { mutableStateOf("") }
     
-    // --- Real-time Location Fetching ---
-    var locationAddress by remember { mutableStateOf("Fetching location...") }
-    val geo = remember(messages) { getLastLocation(context) }
-    
-    LaunchedEffect(geo) {
-        if (geo != null) {
-            try {
-                val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
-                val addresses = geocoder.getFromLocation(geo.latitude, geo.longitude, 1)
-                if (addresses != null && addresses.isNotEmpty()) {
-                    val addr = addresses[0]
-                    val line1 = addr.getAddressLine(0) ?: "Unknown Street"
-                    locationAddress = line1
-                } else {
-                    locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
-                }
-            } catch (e: Exception) {
-                locationAddress = "at %.4f, %.4f".format(geo.latitude, geo.longitude)
-            }
-        } else {
-            locationAddress = "Location access required"
-        }
-    }
     // --- StatusTab Layout Restoration ---
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Column(
@@ -429,6 +511,25 @@ fun StatusTab(
                     fontFamily = FontFamily.SansSerif
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Report button (40dp consistent size)
+                    IconButton(
+                        onClick = onReportClick,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Surface(shape = CircleShape, color = Color(0xFFFEF2F2), modifier = Modifier.fillMaxSize()) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Report,
+                                    "Report Incident",
+                                    tint = SOSRed,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
                     // Map button (40dp consistent size)
                     IconButton(
                         onClick = onMapClick,
@@ -1988,7 +2089,8 @@ fun ProfileTab(
     viewModel: ChatViewModel,
     profile: UserProfile,
     profileManager: UserProfileManager,
-    onEditProfile: () -> Unit
+    onEditProfile: () -> Unit,
+    onReportClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     
@@ -2076,7 +2178,7 @@ fun ProfileTab(
                 title = "Report",
                 subtitle = "Report an incident or app issue",
                 onClick = {
-                    android.widget.Toast.makeText(context, "Report Submitted", android.widget.Toast.LENGTH_SHORT).show()
+                    onReportClick()
                 }
             )
         }
@@ -2385,5 +2487,308 @@ fun ModernSafetyButton(
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// REPORT EMERGENCY SHEET (Category Selection)
+// ─────────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportEmergencySheet(
+    onCategorySelected: (EmergencyCategory) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Report Emergency",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, null, tint = Color.Gray)
+                }
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // Grid of Categories
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.height(350.dp)
+            ) {
+                items(EmergencyCategories) { category ->
+                    CategoryCard(category) { onCategorySelected(category) }
+                }
+            }
+            
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun CategoryCard(category: EmergencyCategory, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+        modifier = Modifier.fillMaxWidth().height(140.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = category.color.copy(alpha = 0.1f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(category.emoji, fontSize = 20.sp)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                category.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// EMERGENCY DETAILS SCREEN
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun EmergencyDetailsScreen(
+    category: EmergencyCategory,
+    locationAddress: String,
+    onBack: () -> Unit,
+    onPickLocation: () -> Unit,
+    onSend: (String) -> Unit
+) {
+    var additionalInfo by remember { mutableStateOf("") }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF9FAFB))
+            .statusBarsPadding()
+    ) {
+        // Custom Top Bar
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ChevronLeft, null, tint = Color.Black)
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "Report Emergency",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(48.dp)) // Placeholder for balance
+        }
+        
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(24.dp))
+            
+            // Large Category Icon
+            Surface(
+                shape = CircleShape,
+                color = if (category.title == "Armed Robbery") Color(0xFFFF3B30) else category.color,
+                modifier = Modifier.size(80.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(category.emoji, fontSize = 40.sp)
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                category.title,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Text(
+                "You are about to send an emergency alert. Emergency services will be contacted immediately.",
+                fontSize = 14.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            
+            Spacer(Modifier.height(32.dp))
+            
+            // Location Picker Card
+            Card(
+                onClick = onPickLocation,
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.LocationOn, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Your current Location", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Spacer(Modifier.height(4.dp))
+                        Text(locationAddress, fontSize = 13.sp, color = Color.Gray, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
+                }
+            }
+            
+            Spacer(Modifier.height(20.dp))
+            
+            // Additional Info
+            Text(
+                "Additional info (optional)",
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = additionalInfo,
+                onValueChange = { additionalInfo = it },
+                placeholder = { Text("Type here...", color = Color.LightGray) },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedBorderColor = MeshBlue
+                )
+            )
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // Safety Guidelines
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF3E8FF),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PrivacyTip, null, tint = Color(0xFF7C3AED), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Safety Guidelines", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    val guidelines = listOf(
+                        "Stay in a safe location until help arrives",
+                        "Keep your phone charged and accessible",
+                        "Be ready to provide additional information",
+                        "Call 911 if situation becomes critical"
+                    )
+                    guidelines.forEach { rule ->
+                        Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text("•", color = Color(0xFF7C3AED), modifier = Modifier.padding(end = 8.dp))
+                            Text(rule, fontSize = 13.sp, color = Color(0xFF6B21A8))
+                        }
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // Emergency Contacts
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Phone, null, tint = Color(0xFFC2410C), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Emergency Contacts", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC2410C))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Police", fontSize = 13.sp, color = Color(0xFF9A3412))
+                        Text("911", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF9A3412))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Fire Department", fontSize = 13.sp, color = Color(0xFF9A3412))
+                        Text("911", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF9A3412))
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(40.dp))
+            
+            // Bottom Actions
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onBack,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.LightGray)
+                ) {
+                    Text("Cancel", color = Color.Black)
+                }
+                
+                Button(
+                    onClick = { onSend(additionalInfo) },
+                    modifier = Modifier.weight(2f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F2937))
+                ) {
+                    Icon(Icons.Default.ArrowOutward, null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Send Emergency Alert", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
