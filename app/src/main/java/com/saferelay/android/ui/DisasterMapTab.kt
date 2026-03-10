@@ -8,7 +8,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +37,7 @@ import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.camera.rememberCameraState
 import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.lazy.items
 import kotlinx.coroutines.launch
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.OrnamentOptions
@@ -88,29 +93,99 @@ fun DisasterMapTab(
     var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF050505))) {
+        val context = LocalContext.current
+        val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
+        val myLocation by locationManager.currentLocation.collectAsState()
+        val cameraState = rememberCameraState(
+            firstPosition = soupCameraPosition(sosMessages, myLocation)
+        )
+        val coroutineScope = rememberCoroutineScope()
+
         SOSMarkerMap(
             sosMessages = sosMessages,
             modifier = Modifier.fillMaxSize(),
             onMarkerClick = { selectedMessage = it },
             isPickingLocation = isPickingLocation,
-            onLocationPicked = onLocationPicked
+            onLocationPicked = onLocationPicked,
+            cameraState = cameraState
         )
 
-        /* // Removed local SOS badge for unified header
-        if (sosMessages.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(12.dp)
-                    .background(SOSRed.copy(alpha = 0.92f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text("🚨 ${sosMessages.size} SOS", fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+        // --- Search Bar Overlay ---
+        var searchQuery by remember { mutableStateOf("") }
+        var searchResults by remember { mutableStateOf<List<android.location.Address>>(emptyList()) }
+        val geocoder = remember { android.location.Geocoder(context) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .statusBarsPadding()
+        ) {
+            MapSearchBar(
+                query = searchQuery,
+                onQueryChange = { query ->
+                    searchQuery = query
+                    if (query.length > 2) {
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            try {
+                                val addresses = geocoder.getFromLocationName(query, 5)
+                                if (addresses != null) {
+                                    searchResults = addresses
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    } else {
+                        searchResults = emptyList()
+                    }
+                },
+                onClear = {
+                    searchQuery = ""
+                    searchResults = emptyList()
+                }
+            )
+
+            if (searchResults.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                        items(searchResults) { address: android.location.Address ->
+                            val fullAddress = address.getAddressLine(0) ?: "Unknown location"
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        searchQuery = fullAddress
+                                        searchResults = emptyList()
+                                        coroutineScope.launch {
+                                            cameraState.animateTo(
+                                                finalPosition = CameraPosition(
+                                                    target = Position(address.longitude, address.latitude),
+                                                    zoom = 15.0
+                                                )
+                                            )
+                                        }
+                                    }
+                                    .padding(16.dp)
+                            ) {
+                                Text(fullAddress, color = Color.Black, fontSize = 14.sp)
+                                address.locality?.let {
+                                    Text(it, color = Color.Gray, fontSize = 12.sp)
+                                }
+                            }
+                            HorizontalDivider(color = Color(0xFFF3F4F6))
+                        }
+                    }
+                }
             }
         }
-        */
         
         selectedMessage?.let { msg ->
             val senderId = msg.senderPeerID ?: msg.sender
@@ -144,10 +219,14 @@ fun DisasterMapSheet(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
+            val cameraState = rememberCameraState(
+                firstPosition = soupCameraPosition(sosMessages, null)
+            )
             SOSMarkerMap(
                 sosMessages = sosMessages,
                 modifier = Modifier.fillMaxSize(),
-                onMarkerClick = { selectedMessage = it }
+                onMarkerClick = { selectedMessage = it },
+                cameraState = cameraState
             )
 
             // Top overlay bar
@@ -209,7 +288,8 @@ fun SOSMarkerMap(
     modifier: Modifier = Modifier,
     onMarkerClick: (SafeRelayMessage) -> Unit,
     isPickingLocation: Boolean = false,
-    onLocationPicked: (com.saferelay.android.model.GeoLocation) -> Unit = {}
+    onLocationPicked: (com.saferelay.android.model.GeoLocation) -> Unit = {},
+    cameraState: org.maplibre.compose.camera.CameraState
 ) {
     val context = LocalContext.current
     val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
@@ -236,11 +316,8 @@ fun SOSMarkerMap(
     }
     
     val userLocationState = org.maplibre.compose.location.rememberUserLocationState(locationProvider = mapLibreLocationProvider)
-
     val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
-    val cameraState = rememberCameraState(
-        firstPosition = soupCameraPosition(sosMessages, myLocation)
-    )
+
 
     // Keep location fresh while map is open
     DisposableEffect(Unit) {
@@ -319,9 +396,9 @@ fun SOSMarkerMap(
                             val props = clickedFeatures.firstOrNull()?.properties?.let { 
                                 if (it is kotlinx.serialization.json.JsonObject) it else null 
                             }
-                            
+
                             val clickedId = props?.get("id")?.toString()?.trim('"')
-                                         
+
                             if (clickedId != null) {
                                 val msg = sosMessages.find { it.id == clickedId }
                                 if (msg != null) onMarkerClick(msg)
@@ -349,7 +426,7 @@ fun SOSMarkerMap(
                     fontWeight = FontWeight.Bold
                 )
             }
-            
+
             // Center crosshair
             Icon(
                 Icons.Default.MyLocation,
@@ -433,5 +510,37 @@ private fun MarkerDetailDialog(
         containerColor = Color(0xFF151515),
         titleContentColor = Color.White,
         textContentColor = Color(0xFFCCCCCC)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MapSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Search location...", color = Color.Gray) },
+        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(Icons.Default.Clear, null, tint = Color.Gray)
+                }
+            }
+        },
+        shape = RoundedCornerShape(24.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            cursorColor = Color.Black
+        ),
+        singleLine = true
     )
 }
