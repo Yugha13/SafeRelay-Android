@@ -325,7 +325,13 @@ fun StatusTab(
     val messages by viewModel.messages.collectAsState(emptyList())
     val connectedPeers by viewModel.connectedPeers.collectAsState(emptyList())
     
-    val myActiveSos = messages.findLast { it.isSosAlert() && it.sender == viewModel.myNickname }
+    val myActiveSos = remember(messages) {
+        val lastEmergencyMsg = messages.findLast { 
+            (it.emergencyType == EmergencyMessageType.SOS || it.emergencyType == EmergencyMessageType.SAFE_STATUS) && 
+            it.sender == viewModel.myNickname 
+        }
+        if (lastEmergencyMsg?.emergencyType == EmergencyMessageType.SOS) lastEmergencyMsg else null
+    }
     val othersActiveSos = messages.filter { it.isSosAlert() && it.sender != viewModel.myNickname }
     
     // Mock Data and Forget State
