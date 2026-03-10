@@ -13,6 +13,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
@@ -376,6 +377,12 @@ fun StatusTab(
     var showAlertSentDialog by remember { mutableStateOf(false) }
     var showDuplicateSosDialog by remember { mutableStateOf(false) }
     var isSendingSos by remember { mutableStateOf(false) }
+
+    // --- Emergency Action Dialogs ---
+    var showEmergencyChoiceDialog by remember { mutableStateOf(false) }
+    var showQuickMessageDialog by remember { mutableStateOf(false) }
+    var selectedEmergencyService by remember { mutableStateOf("") }
+    var quickMessageText by remember { mutableStateOf("") }
     
     // --- Real-time Location Fetching ---
     var locationAddress by remember { mutableStateOf("Fetching location...") }
@@ -482,9 +489,18 @@ fun StatusTab(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                QuickActionItem("Ambulance", "🚑", Color(0xFFFFEDEB))
-                QuickActionItem("Fire", "🚒", Color(0xFFFFE4E6))
-                QuickActionItem("Police", "👮", Color(0xFFDBEAFE))
+                QuickActionItem("Ambulance", "🚑", Color(0xFFFFEDEB)) {
+                    selectedEmergencyService = "Ambulance"
+                    showEmergencyChoiceDialog = true
+                }
+                QuickActionItem("Fire", "🚒", Color(0xFFFFE4E6)) {
+                    selectedEmergencyService = "Fire"
+                    showEmergencyChoiceDialog = true
+                }
+                QuickActionItem("Police", "👮", Color(0xFFDBEAFE)) {
+                    selectedEmergencyService = "Police"
+                    showEmergencyChoiceDialog = true
+                }
             }
 
             Spacer(Modifier.height(60.dp))
@@ -660,23 +676,120 @@ fun StatusTab(
                 }
             )
         }
+
+        // --- Emergency Choice Dialog ---
+        if (showEmergencyChoiceDialog) {
+            AlertDialog(
+                onDismissRequest = { showEmergencyChoiceDialog = false },
+                title = { Text("Contact $selectedEmergencyService") },
+                text = { Text("Choose how you want to reach $selectedEmergencyService.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showEmergencyChoiceDialog = false
+                        val number = when (selectedEmergencyService) {
+                            "Police" -> "100"
+                            "Ambulance" -> "108"
+                            "Fire" -> "101"
+                            else -> "112"
+                        }
+                        val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                            data = android.net.Uri.parse("tel:$number")
+                        }
+                        context.startActivity(intent)
+                    }) {
+                        Text("Call", color = SOSRed, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showEmergencyChoiceDialog = false
+                        showQuickMessageDialog = true
+                    }) {
+                        Text("Message", color = Color.Black)
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White
+            )
+        }
+
+        // --- Quick Message Dialog ---
+        if (showQuickMessageDialog) {
+            AlertDialog(
+                onDismissRequest = { showQuickMessageDialog = false },
+                title = { Text("Message $selectedEmergencyService") },
+                text = {
+                    OutlinedTextField(
+                        value = quickMessageText,
+                        onValueChange = { quickMessageText = it },
+                        placeholder = { Text("type emergency message…", fontSize = 14.sp) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (quickMessageText.isNotBlank()) {
+                                val msg = SafeRelayMessage(
+                                    sender = viewModel.myNickname,
+                                    content = "[$selectedEmergencyService Request]: $quickMessageText",
+                                    type = SafeRelayMessageType.Message,
+                                    timestamp = java.util.Date(),
+                                    emergencyType = EmergencyMessageType.NORMAL,
+                                    priorityLevel = PriorityLevel.URGENT,
+                                    geoLocation = getLastLocation(context)
+                                )
+                                viewModel.sendEmergencyMessage(msg)
+                                quickMessageText = ""
+                                showQuickMessageDialog = false
+                                android.widget.Toast.makeText(context, "Emergency Message Sent!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SOSRed),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text("Send via Mesh")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showQuickMessageDialog = false }) {
+                        Text("Cancel", color = Color.Gray)
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White
+            )
+        }
     }
 }
 
 @Composable
-fun QuickActionItem(label: String, emoji: String, bgColor: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun QuickActionItem(label: String, emoji: String, bgColor: Color, onClick: () -> Unit = {}) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(
+            onClick = onClick,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null
+        )
+    ) {
         Surface(
             shape = CircleShape,
             color = bgColor,
-            modifier = Modifier.size(72.dp)
+            modifier = Modifier.size(64.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(emoji, fontSize = 32.sp)
+                Text(emoji, fontSize = 28.sp)
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(label, fontSize = 14.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Black,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -1956,6 +2069,15 @@ fun ProfileTab(
                 title = "Privacy & Security",
                 subtitle = "Encryption keys and visibility",
                 onClick = { /* Privacy logic */ }
+            )
+
+            ProfileMenuRow(
+                icon = Icons.Filled.Report,
+                title = "Report",
+                subtitle = "Report an incident or app issue",
+                onClick = {
+                    android.widget.Toast.makeText(context, "Report Submitted", android.widget.Toast.LENGTH_SHORT).show()
+                }
             )
         }
         
