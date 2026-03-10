@@ -416,18 +416,55 @@ fun StatusTab(
                     fontFamily = FontFamily.SansSerif
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Nearby devices count chip (Restored)
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFFF3F4F6),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (connectedPeers.isNotEmpty()) SafeGreen else InfoGray)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "${connectedPeers.size} nearby",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4B5563)
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.width(8.dp))
+                    
+                    // Map button (Restored)
+                    IconButton(
+                        onClick = onMapClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color(0xFFF3F4F6), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Filled.Map,
+                            "Disaster Map",
+                            tint = MeshBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
                     IconButton(onClick = { /* Notifications */ }) {
                         Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.size(40.dp)) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Default.Notifications, null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = { /* Info */ }) {
-                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.size(40.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Info, null, tint = Color.Black, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -536,11 +573,6 @@ fun StatusTab(
 
             Spacer(Modifier.height(48.dp))
 
-            // --- Status Text ---
-            Text("No nearby devices", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
-            Spacer(Modifier.height(8.dp))
-            Text("Your SOS will be sent to 0 people", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
-
             Spacer(Modifier.weight(1f))
 
             // --- SHARE SAFETY STATUS (Conditional based on SOS) ---
@@ -590,9 +622,9 @@ fun StatusTab(
                     }
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        if (isSosActive) "I'M SAFE NOW / CANCEL SOS" else "SHARE SAFETY STATUS",
+                        if (isSosActive) "I'M SAFE NOW" else "SEND SOS",
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
