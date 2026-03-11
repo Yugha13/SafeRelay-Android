@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -82,14 +82,40 @@ fun DisasterMapTab(
     isPickingLocation: Boolean = false,
     onLocationPicked: (com.saferelay.android.model.GeoLocation) -> Unit = {}
 ) {
-    val sosMessages = remember(messages, myNickname) {
-        messages.filter {
-            // Include SOS, Reports, and Admin Disasters
-            (it.emergencyType != EmergencyMessageType.NORMAL && it.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
-            it.priorityLevel == PriorityLevel.CRITICAL ||
-            it.content.contains("🚨 [") // Basic check for my custom reports
+    val context = LocalContext.current
+    val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
+    val myLocation by locationManager.currentLocation.collectAsState()
+    
+    // Filtering logic: 20km radius + status
+    var selectedFilter by remember { mutableStateOf("All") }
+    val radiusKm = 20.0
+    
+    val filteredSosMessages = remember(messages, myNickname, myLocation, selectedFilter) {
+        messages.filter { msg ->
+            // Base filter: Include SOS, Reports, and Admin Disasters
+            val isIncident = (msg.emergencyType != EmergencyMessageType.NORMAL && msg.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
+                             msg.priorityLevel == PriorityLevel.CRITICAL ||
+                             msg.content.contains("🚨 [")
+            
+            if (!isIncident) return@filter false
+            
+            // Radius filter
+            val loc = msg.geoLocation ?: return@filter true 
+            val dist = if (myLocation != null) {
+                calculateDistance(myLocation!!.latitude, myLocation!!.longitude, loc.latitude, loc.longitude)
+            } else 0.0
+            
+            if (dist > radiusKm && myLocation != null) return@filter false
+            
+            // Status filter
+            when (selectedFilter) {
+                "Active" -> true // All current SOS/Reports are active until we have "Resolved" state logic
+                "Resolved" -> false
+                else -> true
+            }
         }
     }
+    
     var selectedMessage by remember { mutableStateOf<SafeRelayMessage?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF050505))) {
@@ -97,12 +123,12 @@ fun DisasterMapTab(
         val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
         val myLocation by locationManager.currentLocation.collectAsState()
         val cameraState = rememberCameraState(
-            firstPosition = soupCameraPosition(sosMessages, myLocation)
+            firstPosition = soupCameraPosition(filteredSosMessages, myLocation)
         )
         val coroutineScope = rememberCoroutineScope()
 
         SOSMarkerMap(
-            sosMessages = sosMessages,
+            sosMessages = filteredSosMessages,
             modifier = Modifier.fillMaxSize(),
             onMarkerClick = { selectedMessage = it },
             isPickingLocation = isPickingLocation,
@@ -110,7 +136,7 @@ fun DisasterMapTab(
             cameraState = cameraState
         )
 
-        // --- Search Bar Overlay ---
+        // --- UI Overlays ---
         var searchQuery by remember { mutableStateOf("") }
         var searchResults by remember { mutableStateOf<List<android.location.Address>>(emptyList()) }
         val geocoder = remember { android.location.Geocoder(context) }
@@ -121,6 +147,26 @@ fun DisasterMapTab(
                 .padding(16.dp)
                 .statusBarsPadding()
         ) {
+            // "Incidents Near You" Floating Card
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = CircleShape, color = Color(0xFFFFE4E6), modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Notifications, null, tint = Color(0xFFFF3B30), modifier = Modifier.padding(8.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Incidents Near You", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${filteredSosMessages.size} Active Incidents", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+            }
+
+            // Search Bar
             MapSearchBar(
                 query = searchQuery,
                 onQueryChange = { query ->
@@ -145,6 +191,25 @@ fun DisasterMapTab(
                     searchResults = emptyList()
                 }
             )
+
+            Spacer(Modifier.height(12.dp))
+
+            // Filter Chips
+            Row {
+                listOf("All", "Active", "Resolved").forEach { filter ->
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter) },
+                        modifier = Modifier.padding(end = 8.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF6C63FF),
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
 
             if (searchResults.isNotEmpty()) {
                 Card(

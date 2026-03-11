@@ -64,7 +64,8 @@ val SOSRed     = Color(0xFFFF3B30)
 val UrgentOrange = Color(0xFFFF9500)
 val SafeGreen    = Color(0xFF34C759)
 val InfoGray     = Color(0xFF8E8E93)
-val MeshBlue     = Color(0xFF007AFF)
+val MeshBlue     = Color(0xFF6C63FF) // Updated to Brand Purple
+val BrandPurple  = Color(0xFF6C63FF)
 val DarkBg       = Color(0xFF0D0D0D)
 val CardBg       = Color(0xFF1C1C1E)
 
@@ -87,8 +88,8 @@ val EmergencyCategories = listOf(
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     HOME("Home", Icons.Default.Home),
-    CHAT("Messages", Icons.Default.Chat),
-    MAP("Map", Icons.Default.Map),
+    MAP("Map", Icons.Default.LocationOn),
+    REPORT("Report", Icons.Default.Info),
     PROFILE("Profile", Icons.Default.Person),
 }
 
@@ -175,8 +176,8 @@ fun SafeRelayMainScreen(
             if (selectedTab != SafeRelayTab.HOME) {
                 val headerTitle = when (selectedTab) {
                     SafeRelayTab.HOME -> "SafeRelay"
-                    SafeRelayTab.CHAT -> "Chat"
                     SafeRelayTab.MAP -> "Map"
+                    SafeRelayTab.REPORT -> "Report"
                     SafeRelayTab.PROFILE -> "Profile"
                 }
                 SafeRelayHeader(
@@ -196,12 +197,18 @@ fun SafeRelayMainScreen(
                         viewModel = viewModel,
                         profile = profile,
                         onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
-                        onMapClick = { showDisasterMap = true },
-                        onReportClick = { showReportCategorySheet = true }
+                        onMapClick = { selectedTab = SafeRelayTab.MAP },
+                        onReportClick = { selectedTab = SafeRelayTab.REPORT }
                     )
-                    SafeRelayTab.CHAT   -> SafeRelayTheme(darkTheme = false) {
-                        ChatScreen(viewModel = viewModel, embedded = true)
-                    }
+                    SafeRelayTab.REPORT -> ReportEmergencyTab(
+                        onReportSent = { selectedTab = SafeRelayTab.HOME },
+                        onPickLocation = {
+                            isPickingLocationFromMap = true
+                            selectedTab = SafeRelayTab.MAP
+                        },
+                        locationAddress = locationAddress,
+                        geoLocation = reportLocation ?: getLastLocation(context)
+                    )
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         myNickname = viewModel.myNickname,
@@ -213,8 +220,7 @@ fun SafeRelayMainScreen(
                         onLocationPicked = { geo ->
                             reportLocation = geo
                             isPickingLocationFromMap = false
-                            showReportDetailsScreen = true
-                            selectedTab = SafeRelayTab.HOME // Go back to Home where details screen is shown as overlay
+                            selectedTab = SafeRelayTab.REPORT
                         }
                     )
                     SafeRelayTab.PROFILE -> {
@@ -223,7 +229,7 @@ fun SafeRelayMainScreen(
                             profile = profile,
                             profileManager = profileManager,
                             onEditProfile = { showProfile = true },
-                            onReportClick = { showReportCategorySheet = true }
+                            onReportClick = { selectedTab = SafeRelayTab.REPORT }
                         )
                     }
                 }
@@ -235,7 +241,7 @@ fun SafeRelayMainScreen(
 
                 NavigationBar(
                     containerColor = Color.White,
-                    tonalElevation = 4.dp,
+                    tonalElevation = 0.dp, // Flat appearance
                     modifier = Modifier.navigationBarsPadding()
                 ) {
                     SafeRelayTab.values().forEach { tab ->
@@ -244,31 +250,27 @@ fun SafeRelayMainScreen(
                             selected = selected,
                             onClick = { selectedTab = tab },
                             icon = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(64.dp, 32.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(if (selected) MeshBlue.copy(alpha = 0.1f) else Color.Transparent),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        tab.icon,
-                                        contentDescription = tab.label,
-                                        tint = if (selected) MeshBlue else Color(0xFF9CA3AF),
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                Icon(
+                                    tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = if (selected) BrandPurple else Color(0xFF9CA3AF),
+                                    modifier = Modifier.size(24.dp)
+                                )
                             },
                             label = {
                                 Text(
                                     tab.label,
                                     fontSize = 11.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) MeshBlue else Color(0xFF9CA3AF)
+                                    color = if (selected) BrandPurple else Color(0xFF9CA3AF)
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = Color.Transparent
+                                indicatorColor = Color.Transparent, // Removes the pill
+                                selectedIconColor = BrandPurple,
+                                unselectedIconColor = Color(0xFF9CA3AF),
+                                selectedTextColor = BrandPurple,
+                                unselectedTextColor = Color(0xFF9CA3AF)
                             )
                         )
                     }
@@ -429,7 +431,7 @@ fun StatusTab(
     val context = LocalContext.current
     val userName = if (profile.fullName.isNotBlank()) profile.fullName.split(" ").first() else "User"
     val messages by viewModel.messages.collectAsState(emptyList())
-    val connectedPeers by viewModel.connectedPeers.collectAsState(emptyList())
+    val myLocation = remember(messages) { getLastLocation(context) }
     
     val myActiveSos = remember(messages) {
         val lastEmergencyMsg = messages.findLast { 
@@ -438,431 +440,334 @@ fun StatusTab(
         }
         if (lastEmergencyMsg?.emergencyType == EmergencyMessageType.SOS) lastEmergencyMsg else null
     }
-    val othersActiveSos = messages.filter { it.isSosAlert() && it.sender != viewModel.myNickname }
-    
-    // Mock Data and Forget State
-    var forgottenIds by remember { mutableStateOf(setOf<String>()) }
-    val mockEmergencies = remember {
-        listOf(
-            SafeRelayMessage(
-                id = "m1", 
-                sender = "Mesh", 
-                content = "Armed robbery", 
-                type = SafeRelayMessageType.Message,
-                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
-                emergencyType = EmergencyMessageType.SOS, 
-                priorityLevel = PriorityLevel.CRITICAL
-            ),
-            SafeRelayMessage(
-                id = "m2", 
-                sender = "Mesh", 
-                content = "Break in", 
-                type = SafeRelayMessageType.Message,
-                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
-                emergencyType = EmergencyMessageType.SOS, 
-                priorityLevel = PriorityLevel.URGENT
-            ),
-            SafeRelayMessage(
-                id = "m3", 
-                sender = "Mesh", 
-                content = "Medical Emergency", 
-                type = SafeRelayMessageType.Message,
-                timestamp = java.util.Date(System.currentTimeMillis() - 120000), 
-                emergencyType = EmergencyMessageType.SOS, 
-                priorityLevel = PriorityLevel.INFO
-            )
-        )
+
+    // 20km Radius filtering
+    val nearbyIncidents = remember(messages, myLocation) {
+        messages.filter { msg ->
+            val isIncident = (msg.emergencyType != EmergencyMessageType.NORMAL && msg.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
+                             msg.content.contains("🚨")
+            if (!isIncident) return@filter false
+            
+            val loc = msg.geoLocation ?: return@filter true
+            if (myLocation == null) return@filter true
+            
+            val dist = calculateDistance(myLocation.latitude, myLocation.longitude, loc.latitude, loc.longitude)
+            dist <= 20.0
+        }.sortedByDescending { it.timestamp }
     }
-    
-    val displayEmergencies = (mockEmergencies + othersActiveSos)
-        .filter { it.id !in forgottenIds }
-        .sortedByDescending { it.timestamp }
+
+    var selectedFilter by remember { mutableStateOf("All") }
+    val filteredIncidents = remember(nearbyIncidents, selectedFilter) {
+        when (selectedFilter) {
+            "Active" -> nearbyIncidents.filter { it.emergencyType != EmergencyMessageType.SAFE_STATUS }
+            "Resolved" -> emptyList()
+            else -> nearbyIncidents
+        }
+    }
 
     var showCancelSosDialog by remember { mutableStateOf(false) }
-    var showAlertSentDialog by remember { mutableStateOf(false) }
-    var showDuplicateSosDialog by remember { mutableStateOf(false) }
-    var isSendingSos by remember { mutableStateOf(false) }
 
-    // --- Emergency Action Dialogs ---
-    var showEmergencyChoiceDialog by remember { mutableStateOf(false) }
-    var showQuickMessageDialog by remember { mutableStateOf(false) }
-    var selectedEmergencyService by remember { mutableStateOf("") }
-    var quickMessageText by remember { mutableStateOf("") }
-    
-    // --- StatusTab Layout Restoration ---
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+    Scaffold(
+        containerColor = Color(0xFFF9FAFB),
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onReportClick,
+                containerColor = BrandPurple,
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Add, "Report", modifier = Modifier.size(32.dp))
+            }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp)
         ) {
-            // --- Top Header (SafeRelay, Bell, Info) ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "SafeRelay",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontFamily = FontFamily.SansSerif
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Report button (40dp consistent size)
-                    IconButton(
-                        onClick = onReportClick,
-                        modifier = Modifier.size(40.dp)
+            item {
+                Text("Hi, $userName", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text("Manage your safety preferences", fontSize = 14.sp, color = Color.Gray)
+                Spacer(Modifier.height(24.dp))
+                
+                // SOS Status Card if active
+                if (myActiveSos != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = SOSRed)
                     ) {
-                        Surface(shape = CircleShape, color = Color(0xFFFEF2F2), modifier = Modifier.fillMaxSize()) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Report,
-                                    "Report Incident",
-                                    tint = SOSRed,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.padding(8.dp))
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Emergency Alert Active", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("Broadcasting your location...", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                }
                             }
-                        }
-                    }
-
-                    Spacer(Modifier.width(12.dp))
-
-                    // Map button (40dp consistent size)
-                    IconButton(
-                        onClick = onMapClick,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.fillMaxSize()) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Filled.Map,
-                                    "Disaster Map",
-                                    tint = MeshBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.width(12.dp))
-
-                    // Notifications button (40dp consistent size)
-                    IconButton(
-                        onClick = { /* Notifications */ },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Surface(shape = CircleShape, color = Color(0xFFF3F4F6), modifier = Modifier.fillMaxSize()) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    null,
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            Spacer(Modifier.height(20.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(
+                                    onClick = {
+                                        val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                                        val geo = getLastLocation(context)
+                                        val msg = SafeRelayMessage(
+                                            sender = viewModel.myNickname,
+                                            content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                                            type = SafeRelayMessageType.Message,
+                                            timestamp = java.util.Date(),
+                                            emergencyType = EmergencyMessageType.SAFE_STATUS,
+                                            priorityLevel = PriorityLevel.URGENT,
+                                            geoLocation = geo
+                                        )
+                                        viewModel.sendEmergencyMessage(msg)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SOSRed),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("I'm Safe", fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { showCancelSosDialog = true },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                    border = BorderStroke(1.dp, Color.White),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Cancel SOS")
+                                }
                             }
                         }
                     }
                 }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            // --- Greeting and Avatar ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Hi, $userName!",
-                    fontSize = 36.sp,
-                    color = Color.Black,
-                    fontFamily = FontFamily.Monospace // Courier-style look
-                )
-            }
-
-            Spacer(Modifier.height(48.dp))
-
-            // --- Quick Actions (Ambulance, Fire, Police) ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                QuickActionItem("Ambulance", "🚑", Color(0xFFFFEDEB)) {
-                    selectedEmergencyService = "Ambulance"
-                    showEmergencyChoiceDialog = true
-                }
-                QuickActionItem("Fire", "🚒", Color(0xFFFFE4E6)) {
-                    selectedEmergencyService = "Fire"
-                    showEmergencyChoiceDialog = true
-                }
-                QuickActionItem("Police", "👮", Color(0xFFDBEAFE)) {
-                    selectedEmergencyService = "Police"
-                    showEmergencyChoiceDialog = true
-                }
-            }
-
-            Spacer(Modifier.height(60.dp))
-
-            // --- Central SOS Button with Ripples ---
-            Box(contentAlignment = Alignment.Center) {
-                // Outer soft ripple
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFFE4E6).copy(alpha = 0.3f),
-                    modifier = Modifier.size(280.dp)
-                ) {}
-                // Inner soft ripple
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFFE4E6).copy(alpha = 0.6f),
-                    modifier = Modifier.size(220.dp)
-                ) {}
-                // Main SOS Button
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                    modifier = Modifier
-                        .size(160.dp)
-                        .shadow(10.dp, CircleShape)
-                        .clickable {
-                            if (isSendingSos) return@clickable
-                            if (myActiveSos != null) {
-                                showDuplicateSosDialog = true
-                            } else {
-                                isSendingSos = true
-                                val currentGeo = getLastLocation(context)
-                                val bat = getBatteryPercent(context)
-                                val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
-                                viewModel.sendEmergencyMessage(sos)
-                                SosManager.triggerSosHaptic(context)
-                                showAlertSentDialog = true
-                                isSendingSos = false
-                            }
-                        }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth().height(180.dp).clickable { onMapClick() },
+                    shape = RoundedCornerShape(24.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFFFF4D4D), Color(0xFFFF2D55))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                            Spacer(Modifier.height(4.dp))
-                            Text("SOS", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                    Box {
+                        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE5E7EB))) {
+                            Icon(Icons.Default.Map, null, tint = Color.Gray, modifier = Modifier.align(Alignment.Center).size(48.dp))
                         }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(48.dp))
-
-            Spacer(Modifier.weight(1f))
-
-            // --- SHARE SAFETY STATUS (Conditional based on SOS) ---
-            val isSosActive = myActiveSos != null
-            Button(
-                onClick = {
-                    if (isSosActive) {
-                        showCancelSosDialog = true
-                    } else {
-                        val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
-                        val geo = getLastLocation(context)
-                        val msg = SafeRelayMessage(
-                            sender = viewModel.myNickname,
-                            content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
-                            type = SafeRelayMessageType.Message,
-                            timestamp = java.util.Date(),
-                            emergencyType = EmergencyMessageType.SAFE_STATUS,
-                            priorityLevel = PriorityLevel.URGENT,
-                            geoLocation = geo
-                        )
-                        viewModel.sendEmergencyMessage(msg)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .shadow(8.dp, RoundedCornerShape(32.dp)),
-                shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSosActive) SOSRed else Color.Black
-                )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = if (isSosActive) Color.White else Color(0xFF22C55E),
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                if (isSosActive) Icons.Default.Close else Icons.Default.Check,
-                                null,
-                                tint = if (isSosActive) SOSRed else Color.Black,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        if (isSosActive) "I'M SAFE NOW" else "SEND SOS",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-        }
-
-        // --- Alert Sent Dialog ---
-        if (showAlertSentDialog) {
-            AlertSentDialog(onDismiss = { showAlertSentDialog = false })
-        }
-
-        // --- Duplicate SOS Dialog ---
-        if (showDuplicateSosDialog) {
-            AlertDialog(
-                onDismissRequest = { showDuplicateSosDialog = false },
-                title = { Text("Duplicate Alert?") },
-                text = { Text("SOS is already pushed and waiting for response, do you want to push again?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showDuplicateSosDialog = false
-                        val currentGeo = getLastLocation(context)
-                        val bat = getBatteryPercent(context)
-                        val sos = SosManager.buildSosMessage(viewModel.myNickname, currentGeo, bat)
-                        viewModel.sendEmergencyMessage(sos)
-                        SosManager.triggerSosHaptic(context)
-                        showAlertSentDialog = true
-                    }) {
-                        Text("Push Again")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDuplicateSosDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-
-        // --- Cancel SOS Dialog ---
-        if (showCancelSosDialog) {
-            CancelSosDialog(
-                onDismiss = { showCancelSosDialog = false },
-                onConfirm = {
-                    showCancelSosDialog = false
-                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
-                    val geo = getLastLocation(context)
-                    val msg = SafeRelayMessage(
-                        sender = viewModel.myNickname,
-                        content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
-                        type = SafeRelayMessageType.Message,
-                        timestamp = java.util.Date(),
-                        emergencyType = EmergencyMessageType.SAFE_STATUS,
-                        priorityLevel = PriorityLevel.URGENT,
-                        geoLocation = geo
-                    )
-                    viewModel.sendEmergencyMessage(msg)
-                }
-            )
-        }
-
-        // --- Emergency Choice Dialog ---
-        if (showEmergencyChoiceDialog) {
-            AlertDialog(
-                onDismissRequest = { showEmergencyChoiceDialog = false },
-                title = { Text("Contact $selectedEmergencyService") },
-                text = { Text("Choose how you want to reach $selectedEmergencyService.") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showEmergencyChoiceDialog = false
-                        val number = when (selectedEmergencyService) {
-                            "Police" -> "100"
-                            "Ambulance" -> "108"
-                            "Fire" -> "101"
-                            else -> "112"
-                        }
-                        val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
-                            data = android.net.Uri.parse("tel:$number")
-                        }
-                        context.startActivity(intent)
-                    }) {
-                        Text("Call", color = SOSRed, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showEmergencyChoiceDialog = false
-                        showQuickMessageDialog = true
-                    }) {
-                        Text("Message", color = Color.Black)
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = Color.White
-            )
-        }
-
-        // --- Quick Message Dialog ---
-        if (showQuickMessageDialog) {
-            AlertDialog(
-                onDismissRequest = { showQuickMessageDialog = false },
-                title = { Text("Message $selectedEmergencyService") },
-                text = {
-                    OutlinedTextField(
-                        value = quickMessageText,
-                        onValueChange = { quickMessageText = it },
-                        placeholder = { Text("type emergency message…", fontSize = 14.sp) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (quickMessageText.isNotBlank()) {
-                                val msg = SafeRelayMessage(
-                                    sender = viewModel.myNickname,
-                                    content = "[$selectedEmergencyService Request]: $quickMessageText",
-                                    type = SafeRelayMessageType.Message,
-                                    timestamp = java.util.Date(),
-                                    emergencyType = EmergencyMessageType.NORMAL,
-                                    priorityLevel = PriorityLevel.URGENT,
-                                    geoLocation = getLastLocation(context)
-                                )
-                                viewModel.sendEmergencyMessage(msg)
-                                quickMessageText = ""
-                                showQuickMessageDialog = false
-                                android.widget.Toast.makeText(context, "Emergency Message Sent!", android.widget.Toast.LENGTH_SHORT).show()
+                        Card(
+                            modifier = Modifier.align(Alignment.TopCenter).padding(16.dp).fillMaxWidth(0.85f),
+                            shape = RoundedCornerShape(32.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
+                        ) {
+                            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(shape = CircleShape, color = Color(0xFFFFE4E6), modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Notifications, null, tint = SOSRed, modifier = Modifier.padding(6.dp))
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Incidents Near You", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("${nearbyIncidents.size} Active Incidents", fontSize = 11.sp, color = Color.Gray)
+                                }
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SOSRed),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text("Send via Mesh")
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showQuickMessageDialog = false }) {
-                        Text("Cancel", color = Color.Gray)
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+
+            item {
+                Row(modifier = Modifier.padding(bottom = 16.dp)) {
+                    listOf("All", "Active", "Resolved").forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = { Text(filter) },
+                            modifier = Modifier.padding(end = 8.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BrandPurple,
+                                selectedLabelColor = Color.White
+                            )
+                        )
                     }
-                },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = Color.White
+                }
+            }
+
+            if (filteredIncidents.isEmpty()) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("All clear! No incidents nearby.", color = Color.Gray, textAlign = TextAlign.Center)
+                    }
+                }
+            } else {
+                items(filteredIncidents) { msg ->
+                    IncidentCard(msg)
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        }
+    }
+
+    if (showCancelSosDialog) {
+        CancelSosDialog(
+            onDismiss = { showCancelSosDialog = false },
+            onConfirm = {
+                showCancelSosDialog = false
+                val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                val geo = getLastLocation(context)
+                val msg = SafeRelayMessage(
+                    sender = viewModel.myNickname,
+                    content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                    type = SafeRelayMessageType.Message,
+                    timestamp = java.util.Date(),
+                    emergencyType = EmergencyMessageType.SAFE_STATUS,
+                    priorityLevel = PriorityLevel.URGENT,
+                    geoLocation = geo
+                )
+                viewModel.sendEmergencyMessage(msg)
+            }
+        )
+    }
+}
+
+@Composable
+fun ReportEmergencyTab(
+    onReportSent: () -> Unit,
+    onPickLocation: () -> Unit,
+    locationAddress: String,
+    geoLocation: com.saferelay.android.model.GeoLocation?
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(EmergencyCategories.first()) }
+    
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Text("Report Emergency", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Help keep your community safe", fontSize = 14.sp, color = Color.Gray)
+        
+        Spacer(Modifier.height(32.dp))
+        
+        Text("Emergency Type", fontWeight = FontWeight.Bold)
+        LazyRow(modifier = Modifier.padding(vertical = 12.dp)) {
+            items(EmergencyCategories) { cat ->
+                FilterChip(
+                    selected = category == cat,
+                    onClick = { category = cat },
+                    label = { Text("${cat.emoji} ${cat.title}") },
+                    modifier = Modifier.padding(end = 8.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = cat.color,
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        Text("Emergency Title", fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            placeholder = { Text("e.g Building fire on Main Street") },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        )
+        
+        Spacer(Modifier.height(24.dp))
+        Text("Location", fontWeight = FontWeight.Bold)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable { onPickLocation() },
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F6)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.LocationOn, null, tint = BrandPurple)
+                Spacer(Modifier.width(12.dp))
+                Text(locationAddress, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
+            }
+        }
+        
+        Spacer(Modifier.height(32.dp))
+        Button(
+            onClick = onReportSent, // Simplified for now
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+        ) {
+            Text("Send Emergency Alert", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                "Note: Your report will be reviewed... Call local emergency services first.",
+                modifier = Modifier.padding(16.dp),
+                fontSize = 12.sp,
+                color = BrandPurple
             )
         }
     }
+}
+
+@Composable
+fun IncidentCard(msg: SafeRelayMessage) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = SOSRed.copy(alpha = 0.1f), modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text(if (msg.content.contains("Fire")) "🔥" else "🚨", fontSize = 20.sp) }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(msg.content, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Avoid the area. Stay safe.", fontSize = 13.sp, color = Color.Gray)
+                }
+                StatusBadge(isActive = true)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.LocationOn, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(msg.sender, fontSize = 12.sp, color = Color.Gray)
+                Spacer(Modifier.width(16.dp))
+                Icon(Icons.Default.AccessTime, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Just now", fontSize = 12.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusBadge(isActive: Boolean) {
+    Surface(
+        color = if (isActive) Color(0xFFFFE4E6) else Color(0xFFF0FDF4),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(6.dp).background(if (isActive) SOSRed else SafeGreen, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(if (isActive) "Active" else "Resolved", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isActive) SOSRed else SafeGreen)
+        }
+    }
+}
+
+fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return r * c
 }
 
 @Composable
@@ -2093,21 +1998,27 @@ fun ProfileTab(
     onReportClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    
+    var alertRadius by remember { mutableFloatStateOf(20f) }
+    var localNotifications by remember { mutableStateOf(true) }
+    var sosAlerts by remember { mutableStateOf(true) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(20.dp),
+            .background(Color(0xFFF9FAFB))
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(Modifier.height(20.dp))
+        
         // Large Profile Avatar
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(110.dp)
                 .clip(CircleShape)
-                .background(SOSRed.copy(alpha = 0.1f))
-                .border(2.dp, SOSRed.copy(alpha = 0.2f), CircleShape),
+                .background(BrandPurple.copy(alpha = 0.1f))
+                .border(3.dp, BrandPurple.copy(alpha = 0.2f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             val initials = if (profile.fullName.isNotBlank()) {
@@ -2117,9 +2028,9 @@ fun ProfileTab(
             }
             Text(
                 text = initials,
-                fontSize = 32.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                color = SOSRed
+                color = BrandPurple
             )
         }
         
@@ -2127,16 +2038,52 @@ fun ProfileTab(
         
         Text(
             text = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
             color = Color.Black
         )
         Text(
-            text = "SafeRelay Verified User",
-            fontSize = 14.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Medium
+            text = "@${viewModel.myNickname}",
+            fontSize = 15.sp,
+            color = Color.Gray
         )
+        
+        Spacer(Modifier.height(40.dp))
+        
+        // Settings Section
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text("Alert Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(1.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Radar, null, tint = BrandPurple)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Incident Radius", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.weight(1f))
+                        Text("${alertRadius.toInt()} km", fontWeight = FontWeight.Bold, color = BrandPurple)
+                    }
+                    Slider(
+                        value = alertRadius,
+                        onValueChange = { alertRadius = it },
+                        valueRange = 5f..50f,
+                        modifier = Modifier.padding(top = 8.dp),
+                        colors = SliderDefaults.colors(thumbColor = BrandPurple, activeTrackColor = BrandPurple)
+                    )
+                    
+                    Divider(Modifier.padding(vertical = 16.dp), thickness = 0.5.dp, color = Color.LightGray)
+                    
+                    ToggleRow("Local Incidents", "Notify about nearby reports", localNotifications) { localNotifications = it }
+                    Spacer(Modifier.height(16.dp))
+                    ToggleRow("SOS Alerts", "Priority critical alerts", sosAlerts) { sosAlerts = it }
+                }
+            }
+        }
         
         Spacer(Modifier.height(32.dp))
         
@@ -2153,43 +2100,37 @@ fun ProfileTab(
             )
             
             ProfileMenuRow(
-                icon = Icons.Filled.Info,
-                title = "Personal Information",
-                subtitle = "Age, Gender, Blood Group, etc.",
-                onClick = { /* Could show restricted read-only view */ }
-            )
-            
-            ProfileMenuRow(
-                icon = Icons.Filled.Settings,
-                title = "App Settings",
-                subtitle = "Notifications, Mesh Networking, Data",
-                onClick = { /* Settings logic */ }
-            )
-            
-            ProfileMenuRow(
-                icon = Icons.Filled.PrivacyTip,
-                title = "Privacy & Security",
-                subtitle = "Encryption keys and visibility",
-                onClick = { /* Privacy logic */ }
+                icon = Icons.Filled.Report,
+                title = "Report Incident",
+                subtitle = "Help your community stay safe",
+                onClick = onReportClick
             )
 
             ProfileMenuRow(
-                icon = Icons.Filled.Report,
-                title = "Report",
-                subtitle = "Report an incident or app issue",
-                onClick = {
-                    onReportClick()
-                }
+                icon = Icons.Filled.Share,
+                title = "Share SafeRelay",
+                subtitle = "Invite friends to the mesh network",
+                onClick = { /* Share logic */ }
             )
         }
         
-        Spacer(Modifier.weight(1f))
-        
-        Text(
-            text = "SafeRelay Android v1.7.1",
-            fontSize = 12.sp,
-            color = Color.LightGray,
-            fontWeight = FontWeight.Normal
+        Spacer(Modifier.height(40.dp))
+        Text("SafeRelay v1.8.0", fontSize = 12.sp, color = Color.LightGray)
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+fun ToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = BrandPurple)
         )
     }
 }
