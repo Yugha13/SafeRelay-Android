@@ -88,8 +88,8 @@ val EmergencyCategories = listOf(
 // ── Tabs ───────────────────────────────────────────────────────────────────
 enum class SafeRelayTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     HOME("Home", Icons.Default.Home),
-    MAP("Map", Icons.Default.LocationOn),
-    REPORT("Report", Icons.Default.Info),
+    MESSAGES("Messages", Icons.Default.Message),
+    MAP("Map", Icons.Default.Map),
     PROFILE("Profile", Icons.Default.Person),
 }
 
@@ -176,8 +176,8 @@ fun SafeRelayMainScreen(
             if (selectedTab != SafeRelayTab.HOME) {
                 val headerTitle = when (selectedTab) {
                     SafeRelayTab.HOME -> "SafeRelay"
+                    SafeRelayTab.MESSAGES -> "Messages"
                     SafeRelayTab.MAP -> "Map"
-                    SafeRelayTab.REPORT -> "Report"
                     SafeRelayTab.PROFILE -> "Profile"
                 }
                 SafeRelayHeader(
@@ -198,17 +198,11 @@ fun SafeRelayMainScreen(
                         profile = profile,
                         onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
                         onMapClick = { selectedTab = SafeRelayTab.MAP },
-                        onReportClick = { selectedTab = SafeRelayTab.REPORT }
+                        onReportClick = { showReportCategorySheet = true } // Report via sheet now
                     )
-                    SafeRelayTab.REPORT -> ReportEmergencyTab(
-                        onReportSent = { selectedTab = SafeRelayTab.HOME },
-                        onPickLocation = {
-                            isPickingLocationFromMap = true
-                            selectedTab = SafeRelayTab.MAP
-                        },
-                        locationAddress = locationAddress,
-                        geoLocation = reportLocation ?: getLastLocation(context)
-                    )
+                    SafeRelayTab.MESSAGES -> {
+                        EmergencyFeedTab(messages = messages, viewModel = viewModel)
+                    }
                     SafeRelayTab.MAP    -> DisasterMapTab(
                         messages = messages,
                         myNickname = viewModel.myNickname,
@@ -220,7 +214,8 @@ fun SafeRelayMainScreen(
                         onLocationPicked = { geo ->
                             reportLocation = geo
                             isPickingLocationFromMap = false
-                            selectedTab = SafeRelayTab.REPORT
+                            selectedTab = SafeRelayTab.HOME
+                            showReportCategorySheet = true
                         }
                     )
                     SafeRelayTab.PROFILE -> {
@@ -229,7 +224,10 @@ fun SafeRelayMainScreen(
                             profile = profile,
                             profileManager = profileManager,
                             onEditProfile = { showProfile = true },
-                            onReportClick = { selectedTab = SafeRelayTab.REPORT }
+                            onReportClick = { 
+                                selectedTab = SafeRelayTab.HOME
+                                showReportCategorySheet = true 
+                            }
                         )
                     }
                 }
@@ -470,67 +468,102 @@ fun StatusTab(
     var showCancelSosDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = Color(0xFFF9FAFB)
+        containerColor = Color.White
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Greeting
+            // --- Custom Home Header ---
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Hi, $userName",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "How can we help you today?",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
+                Text(
+                    text = "SafeRelay",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Report Button
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFFEF2F2),
+                        modifier = Modifier.size(40.dp).clickable { onReportClick() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Error, null, tint = SOSRed, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    // Map Button
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFEFF6FF),
+                        modifier = Modifier.size(40.dp).clickable { onMapClick() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Map, null, tint = MeshBlue, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    // Notifications Button
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFF3F4F6),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Notifications, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            // --- Greeting ---
+            Text(
+                text = "Hi, $userName!",
+                fontSize = 42.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = FontFamily.Monospace,
+                color = Color.Black,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp)
+            )
 
-            // Quick Actions Circle Row
+            // --- Quick Actions ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                QuickActionItem("Ambulance", "🚑", Color(0xFFF0FDF4), onClick = {
-                    // Logic to show emergency dialog
-                })
-                QuickActionItem("Fire", "🔥", Color(0xFFFEF2F2), onClick = {
-                    // Logic to show emergency dialog
-                })
-                QuickActionItem("Police", "👮", Color(0xFFEFF6FF), onClick = {
-                    // Logic to show emergency dialog
-                })
+                QuickActionItem("Ambulance", "🚑", Color(0xFFFEF2F2), onClick = { /* TODO */ })
+                QuickActionItem("Fire", "🔥", Color(0xFFFEF2F2), onClick = { /* TODO */ })
+                QuickActionItem("Police", "👮", Color(0xFFEFF6FF), onClick = { /* TODO */ })
             }
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(64.dp))
 
-            // Central SOS Button with ripples
+            // --- Central SOS Button with ripples ---
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                // Background ripples could be added here
+                // Outer Ripple
+                Box(
+                    modifier = Modifier.size(280.dp).background(SOSRed.copy(alpha = 0.03f), CircleShape)
+                )
+                // Middle Ripple
+                Box(
+                    modifier = Modifier.size(240.dp).background(SOSRed.copy(alpha = 0.05f), CircleShape)
+                )
+                
                 Surface(
                     shape = CircleShape,
-                    color = SOSRed,
+                    color = SOSRed.copy(alpha = 0.8f),
                     modifier = Modifier
-                        .size(220.dp)
+                        .size(180.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -548,76 +581,75 @@ fun StatusTab(
                                     geoLocation = geo
                                 )
                                 viewModel.sendEmergencyMessage(msg)
-                                // Reset after debounce
-                                scope.launch {
-                                    delay(2000)
-                                    isSendingSos = false
-                                }
+                                scope.launch { delay(2000); isSendingSos = false }
                             }
                         },
-                    shadowElevation = 8.dp
+                    shadowElevation = 0.dp
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text("🆘", fontSize = 64.sp)
-                        Spacer(Modifier.height(8.dp))
+                        Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
-                            text = if (myActiveSos != null) "HELP ACTIVE" else "SEND SOS",
+                            text = "SOS",
                             color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 32.sp
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(48.dp))
 
-            // Share Safety Status Button
+            // --- Bottom SEND SOS Pill Button ---
             Button(
                 onClick = {
-                    val geo = getLastLocation(context)
-                    val msg = SafeRelayMessage(
-                        sender = viewModel.myNickname,
-                        content = "✅ SAFE: @${viewModel.myNickname} is currently SAFE.",
-                        type = SafeRelayMessageType.Message,
-                        timestamp = java.util.Date(),
-                        emergencyType = EmergencyMessageType.SAFE_STATUS,
-                        priorityLevel = PriorityLevel.URGENT,
-                        geoLocation = geo
-                    )
-                    viewModel.sendEmergencyMessage(msg)
+                    if (myActiveSos != null) {
+                        showCancelSosDialog = true
+                    } else {
+                        val geo = getLastLocation(context)
+                        val msg = SafeRelayMessage(
+                            sender = viewModel.myNickname,
+                            content = "🆘 SOS ALERT: @${viewModel.myNickname} needs help!",
+                            type = SafeRelayMessageType.Message,
+                            timestamp = java.util.Date(),
+                            emergencyType = EmergencyMessageType.SOS,
+                            priorityLevel = PriorityLevel.URGENT,
+                            geoLocation = geo
+                        )
+                        viewModel.sendEmergencyMessage(msg)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
+                    .height(64.dp)
+                    .padding(horizontal = 8.dp),
+                shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
             ) {
-                Text(
-                    text = "SHARE SAFETY STATUS",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            }
-
-            // My Active SOS Card or other info
-            if (myActiveSos != null) {
-                Spacer(Modifier.height(16.dp))
-                MyActiveSosCard(myActiveSos) {
-                    showCancelSosDialog = true
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF34C759),
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp).padding(4.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = if (myActiveSos != null) "I'M SAFE NOW" else "SEND SOS",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
             
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "Tap Map in header to see others' reports",
-                fontSize = 12.sp,
-                color = Color.LightGray
-            )
+            Spacer(Modifier.height(24.dp))
         }
     }
 
