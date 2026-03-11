@@ -609,7 +609,7 @@ fun StatusTab(
                     if (isSendingSos) return@Button
                     
                     if (myActiveSos != null) {
-                        showRePushSosDialog = true
+                        showCancelSosDialog = true
                     } else {
                         isSendingSos = true
                         val geo = getLastLocation(context)
