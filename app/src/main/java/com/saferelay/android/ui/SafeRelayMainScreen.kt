@@ -466,6 +466,7 @@ fun StatusTab(
     val scope = rememberCoroutineScope()
     var isSendingSos by remember { mutableStateOf(false) }
     var showCancelSosDialog by remember { mutableStateOf(false) }
+    var showRePushSosDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color.White
@@ -568,7 +569,11 @@ fun StatusTab(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            if (myActiveSos == null && !isSendingSos) {
+                            if (isSendingSos) return@clickable
+                            
+                            if (myActiveSos != null) {
+                                showRePushSosDialog = true
+                            } else {
                                 isSendingSos = true
                                 val geo = getLastLocation(context)
                                 val bat = getBatteryPercent(context)
@@ -601,14 +606,18 @@ fun StatusTab(
             // --- Bottom SEND SOS Pill Button ---
             Button(
                 onClick = {
+                    if (isSendingSos) return@Button
+                    
                     if (myActiveSos != null) {
-                        showCancelSosDialog = true
+                        showRePushSosDialog = true
                     } else {
+                        isSendingSos = true
                         val geo = getLastLocation(context)
                         val bat = getBatteryPercent(context)
                         val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                         viewModel.sendEmergencyMessage(msg)
                         SosManager.triggerSosHaptic(context)
+                        scope.launch { delay(2000); isSendingSos = false }
                     }
                 },
                 modifier = Modifier
@@ -639,6 +648,35 @@ fun StatusTab(
             
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showRePushSosDialog) {
+        AlertDialog(
+            onDismissRequest = { showRePushSosDialog = false },
+            title = { Text("Already Pushed") },
+            text = { Text("SOS is already pushed and waiting for response. Do you want to push again?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRePushSosDialog = false
+                        isSendingSos = true
+                        val geo = getLastLocation(context)
+                        val bat = getBatteryPercent(context)
+                        val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                        viewModel.sendEmergencyMessage(msg)
+                        SosManager.triggerSosHaptic(context)
+                        scope.launch { delay(2000); isSendingSos = false }
+                    }
+                ) {
+                    Text("Push Again", color = SOSRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRePushSosDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showCancelSosDialog) {
