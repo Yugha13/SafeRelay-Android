@@ -468,6 +468,8 @@ fun StatusTab(
     var isSendingSos by remember { mutableStateOf(false) }
     var showCancelSosDialog by remember { mutableStateOf(false) }
     var showRePushSosDialog by remember { mutableStateOf(false) }
+    var sosHoldProgress by remember { mutableStateOf(0f) }
+    var isHoldingSosButton by remember { mutableStateOf(false) }
     
     // Quick Action Dialog State
     var showEmergencyActionDialog by remember { mutableStateOf(false) }
@@ -584,43 +586,90 @@ fun StatusTab(
                     color = SOSRed.copy(alpha = 0.8f),
                     modifier = Modifier
                         .size(180.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            if (isSendingSos) return@clickable
-                            
-                            if (myActiveSos != null) {
-                                showRePushSosDialog = true
-                            } else {
-                                isSendingSos = true
-                                val geo = getLastLocation(context)
-                                val bat = getBatteryPercent(context)
-                                val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                                viewModel.sendEmergencyMessage(msg)
-                                SosManager.triggerSosHaptic(context)
-                                scope.launch { delay(2000); isSendingSos = false }
-                            }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    if (myActiveSos != null) {
+                                        showRePushSosDialog = true
+                                        return@detectTapGestures
+                                    }
+                                    if (isSendingSos) return@detectTapGestures
+
+                                    isHoldingSosButton = true
+                                    val startTime = System.currentTimeMillis()
+                                    val holdJob = scope.launch {
+                                        while (isHoldingSosButton) {
+                                            val elapsed = System.currentTimeMillis() - startTime
+                                            sosHoldProgress = (elapsed / 3000f).coerceIn(0f, 1f)
+                                            if (sosHoldProgress >= 1f) {
+                                                isSendingSos = true
+                                                val geo = getLastLocation(context)
+                                                val bat = getBatteryPercent(context)
+                                                val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                                                viewModel.sendEmergencyMessage(msg)
+                                                SosManager.triggerSosHaptic(context)
+                                                isHoldingSosButton = false
+                                                sosHoldProgress = 0f
+                                                delay(2000)
+                                                isSendingSos = false
+                                                break
+                                            }
+                                            delay(16)
+                                        }
+                                    }
+                                    try {
+                                        awaitRelease()
+                                    } finally {
+                                        isHoldingSosButton = false
+                                        sosHoldProgress = 0f
+                                        holdJob.cancel()
+                                    }
+                                }
+                            )
                         },
                     shadowElevation = 0.dp
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "SOS",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 32.sp
-                        )
+                    Box(contentAlignment = Alignment.Center) {
+                        // Progress Arc
+                        if (sosHoldProgress > 0f) {
+                            Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+                                drawArc(
+                                    brush = Brush.sweepGradient(listOf(Color.White.copy(0.5f), Color.White)),
+                                    startAngle = -90f,
+                                    sweepAngle = 360f * sosHoldProgress,
+                                    useCenter = false,
+                                    style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                            }
+                        }
+                        
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "SOS",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                text = "Hold for 3s to send SOS",
+                color = Color.Gray,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(Modifier.height(32.dp))
 
             // --- Bottom I'M SAFE NOW Pill Button ---
             Button(
