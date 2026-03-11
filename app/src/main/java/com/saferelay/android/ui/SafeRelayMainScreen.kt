@@ -571,16 +571,10 @@ fun StatusTab(
                             if (myActiveSos == null && !isSendingSos) {
                                 isSendingSos = true
                                 val geo = getLastLocation(context)
-                                val msg = SafeRelayMessage(
-                                    sender = viewModel.myNickname,
-                                    content = "🆘 SOS ALERT: @${viewModel.myNickname} needs help!",
-                                    type = SafeRelayMessageType.Message,
-                                    timestamp = java.util.Date(),
-                                    emergencyType = EmergencyMessageType.SOS,
-                                    priorityLevel = PriorityLevel.URGENT,
-                                    geoLocation = geo
-                                )
+                                val bat = getBatteryPercent(context)
+                                val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                                 viewModel.sendEmergencyMessage(msg)
+                                SosManager.triggerSosHaptic(context)
                                 scope.launch { delay(2000); isSendingSos = false }
                             }
                         },
@@ -611,16 +605,10 @@ fun StatusTab(
                         showCancelSosDialog = true
                     } else {
                         val geo = getLastLocation(context)
-                        val msg = SafeRelayMessage(
-                            sender = viewModel.myNickname,
-                            content = "🆘 SOS ALERT: @${viewModel.myNickname} needs help!",
-                            type = SafeRelayMessageType.Message,
-                            timestamp = java.util.Date(),
-                            emergencyType = EmergencyMessageType.SOS,
-                            priorityLevel = PriorityLevel.URGENT,
-                            geoLocation = geo
-                        )
+                        val bat = getBatteryPercent(context)
+                        val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                         viewModel.sendEmergencyMessage(msg)
+                        SosManager.triggerSosHaptic(context)
                     }
                 },
                 modifier = Modifier
