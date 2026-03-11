@@ -12,6 +12,9 @@ class SafeRelayApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize Supabase (requires credentials in environment)
+        com.saferelay.android.net.SupabaseModule.init()
 
         // Initialize Tor first so any early network goes over Tor
         try {

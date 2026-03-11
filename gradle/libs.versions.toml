@@ -65,6 +65,9 @@ lifecycle-process = "2.8.7"
 maplibre-compose = "0.12.1"
 maplibre-android-sdk = "12.0.1"
 spatialk = "0.6.1"
+supabase = "3.1.2"
+kotlinx-serialization = "1.8.0"
+ktor = "3.1.0"
 
 [libraries]
 # AndroidX Core
@@ -142,12 +145,26 @@ maplibre-compose = { module = "org.maplibre.compose:maplibre-compose-android", v
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre-android-sdk" }
 spatialk-geojson = { group = "org.maplibre.spatialk", name = "geojson", version.ref = "spatialk" }
 
+# Supabase
+supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabase" }
+supabase-postgrest = { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
+supabase-storage = { module = "io.github.jan-tennert.supabase:storage-kt" }
+supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt" }
+
+# Kotlin Serialization
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# Ktor
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-parcelize = { id = "kotlin-parcelize" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 [bundles]
 compose = [
@@ -182,3 +199,10 @@ compose-testing = [
     "androidx-compose-ui-test-junit4",
     "androidx-compose-ui-test-manifest"
 ] 
+
+supabase = [
+    "supabase-postgrest",
+    "supabase-realtime",
+    "supabase-storage",
+    "supabase-auth"
+]
