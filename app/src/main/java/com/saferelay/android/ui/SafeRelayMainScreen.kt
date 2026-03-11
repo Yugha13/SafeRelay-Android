@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.BatteryManager
@@ -467,6 +468,12 @@ fun StatusTab(
     var isSendingSos by remember { mutableStateOf(false) }
     var showCancelSosDialog by remember { mutableStateOf(false) }
     var showRePushSosDialog by remember { mutableStateOf(false) }
+    
+    // Quick Action Dialog State
+    var showEmergencyActionDialog by remember { mutableStateOf(false) }
+    var showEmergencyMessageInputDialog by remember { mutableStateOf(false) }
+    var selectedEmergencyType by remember { mutableStateOf("Ambulance") }
+    var selectedEmergencyNumber by remember { mutableStateOf("911") }
 
     Scaffold(
         containerColor = Color.White
@@ -539,9 +546,21 @@ fun StatusTab(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                QuickActionItem("Ambulance", "🚑", Color(0xFFFEF2F2), onClick = { /* TODO */ })
-                QuickActionItem("Fire", "🔥", Color(0xFFFEF2F2), onClick = { /* TODO */ })
-                QuickActionItem("Police", "👮", Color(0xFFEFF6FF), onClick = { /* TODO */ })
+                QuickActionItem("Ambulance", "🚑", Color(0xFFFEF2F2), onClick = {
+                    selectedEmergencyType = "Ambulance"
+                    selectedEmergencyNumber = "911"
+                    showEmergencyActionDialog = true
+                })
+                QuickActionItem("Fire", "🔥", Color(0xFFFEF2F2), onClick = {
+                    selectedEmergencyType = "Fire"
+                    selectedEmergencyNumber = "911"
+                    showEmergencyActionDialog = true
+                })
+                QuickActionItem("Police", "👮", Color(0xFFEFF6FF), onClick = {
+                    selectedEmergencyType = "Police"
+                    selectedEmergencyNumber = "911"
+                    showEmergencyActionDialog = true
+                })
             }
 
             Spacer(Modifier.height(64.dp))
@@ -603,42 +622,39 @@ fun StatusTab(
 
             Spacer(Modifier.height(48.dp))
 
-            // --- Bottom SEND SOS Pill Button ---
+            // --- Bottom I'M SAFE NOW Pill Button ---
             Button(
                 onClick = {
-                    if (isSendingSos) return@Button
-                    
-                    if (myActiveSos != null) {
-                        showCancelSosDialog = true
-                    } else {
-                        isSendingSos = true
-                        val geo = getLastLocation(context)
-                        val bat = getBatteryPercent(context)
-                        val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                        viewModel.sendEmergencyMessage(msg)
-                        SosManager.triggerSosHaptic(context)
-                        scope.launch { delay(2000); isSendingSos = false }
-                    }
+                    showCancelSosDialog = true
                 },
+                enabled = myActiveSos != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .padding(horizontal = 8.dp),
                 shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    disabledContainerColor = Color(0xFFE5E7EB)
+                )
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF34C759),
+                        color = if (myActiveSos != null) Color(0xFF34C759) else Color.LightGray,
                         modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp).padding(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(16.dp).padding(4.dp)
+                        )
                     }
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        text = if (myActiveSos != null) "I'M SAFE NOW" else "SEND SOS",
-                        color = Color.White,
+                        text = "I'M SAFE NOW",
+                        color = if (myActiveSos != null) Color.White else Color.Gray,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         fontFamily = FontFamily.Monospace
@@ -697,6 +713,46 @@ fun StatusTab(
                 )
                 viewModel.sendEmergencyMessage(msg)
             }
+        )
+    }
+
+    if (showEmergencyActionDialog) {
+        EmergencyActionDialog(
+            contactType = selectedEmergencyType,
+            contactNumber = selectedEmergencyNumber,
+            onCall = { number ->
+                showEmergencyActionDialog = false
+                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
+                context.startActivity(intent)
+            },
+            onMessage = { type ->
+                showEmergencyActionDialog = false
+                showEmergencyMessageInputDialog = true
+            },
+            onDismiss = { showEmergencyActionDialog = false }
+        )
+    }
+
+    if (showEmergencyMessageInputDialog) {
+        EmergencyMessageInputDialog(
+            contactType = selectedEmergencyType,
+            onSend = { text ->
+                showEmergencyMessageInputDialog = false
+                val geo = getLastLocation(context)
+                val bat = getBatteryPercent(context)
+                val msg = SafeRelayMessage(
+                    sender = viewModel.myNickname,
+                    content = "🚨 EMERGENCY REQUEST ($selectedEmergencyType):\n$text",
+                    type = SafeRelayMessageType.Message,
+                    timestamp = java.util.Date(),
+                    emergencyType = EmergencyMessageType.SOS,
+                    priorityLevel = PriorityLevel.CRITICAL,
+                    geoLocation = geo
+                )
+                viewModel.sendEmergencyMessage(msg)
+                SosManager.triggerSosHaptic(context)
+            },
+            onDismiss = { showEmergencyMessageInputDialog = false }
         )
     }
 }
