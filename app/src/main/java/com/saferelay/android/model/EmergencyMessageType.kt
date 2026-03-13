@@ -2,11 +2,13 @@ package com.saferelay.android.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 
 /**
  * SafeRelay Emergency Message Types – matches iOS SafeRelay MessageType enum exactly.
  * Protocol wire values (rawValue) are preserved 1:1 for cross-platform compatibility.
  */
+@Serializable
 @Parcelize
 enum class EmergencyMessageType(val rawValue: UByte, val emoji: String, val label: String) : Parcelable {
     NORMAL(0u, "💬", "Message"),
@@ -25,6 +27,7 @@ enum class EmergencyMessageType(val rawValue: UByte, val emoji: String, val labe
 /**
  * Priority levels – matches iOS SafeRelay PriorityLevel enum exactly.
  */
+@Serializable
 @Parcelize
 enum class PriorityLevel(val rawValue: UByte, val label: String) : Parcelable {
     CRITICAL(1u, "CRITICAL"),
@@ -40,6 +43,7 @@ enum class PriorityLevel(val rawValue: UByte, val label: String) : Parcelable {
 /**
  * Geographic location attached to emergency messages.
  */
+@Serializable
 @Parcelize
 data class GeoLocation(
     val latitude: Double,

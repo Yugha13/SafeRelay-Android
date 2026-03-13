@@ -49,7 +49,8 @@ object SosManager {
             isRelay = false,
             emergencyType = EmergencyMessageType.SOS,
             priorityLevel = PriorityLevel.CRITICAL,
-            geoLocation = location
+            geoLocation = location,
+            batteryLevel = batteryPercent
         )
     }
 

@@ -16,6 +16,8 @@ import com.saferelay.android.model.SafeRelayMessage
 import com.saferelay.android.model.SafeRelayMessageType
 import com.saferelay.android.nostr.NostrIdentityBridge
 import com.saferelay.android.protocol.SafeRelayPacket
+import com.saferelay.android.net.SupabaseModule
+import io.github.jan.supabase.postgrest.postgrest
 
 
 import kotlinx.coroutines.launch
@@ -592,6 +594,16 @@ class ChatViewModel(
             messageManager.addMessage(message)
             // Broadcast via mesh with no channel filter so it propagates to all nodes
             meshService.sendMessage(message.content, emptyList(), null)
+
+            // Sync to Supabase
+            viewModelScope.launch {
+                try {
+                    SupabaseModule.getClient()?.postgrest?.from("messages")?.insert(message)
+                    Log.d(TAG, "Successfully synced emergency message to Supabase: ${message.id}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync emergency message to Supabase: ${e.message}")
+                }
+            }
         } catch (e: Exception) {
             android.util.Log.w(TAG, "sendEmergencyMessage failed: ${e.message}")
         }

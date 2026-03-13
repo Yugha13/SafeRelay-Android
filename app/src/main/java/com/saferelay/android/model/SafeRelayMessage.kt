@@ -6,13 +6,35 @@ import kotlinx.parcelize.Parcelize
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.Transient
 
+@Serializable
 @Parcelize
 enum class SafeRelayMessageType : Parcelable {
     Message,
     Audio,
     Image,
     File
+}
+
+object DateSerializer : KSerializer<Date> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Date", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Date) {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
+        encoder.encodeString(format.format(value))
+    }
+    override fun deserialize(decoder: Decoder): Date {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
+        return format.parse(decoder.decodeString()) ?: Date()
+    }
 }
 
 // Emergency type display helper
@@ -63,29 +85,75 @@ sealed class DeliveryStatus : Parcelable {
 /**
  * SafeRelayMessage - 100% compatible with iOS version
  */
+@Serializable
 @Parcelize
 data class SafeRelayMessage(
     val id: String = UUID.randomUUID().toString().uppercase(),
+    
+    @SerialName("sender_nickname")
     val sender: String,
+    
     val content: String,
+    
+    @SerialName("message_type")
     val type: SafeRelayMessageType = SafeRelayMessageType.Message,
+    
+    @Serializable(with = DateSerializer::class)
     val timestamp: Date,
+    
+    @SerialName("is_relay")
     val isRelay: Boolean = false,
+    
+    @SerialName("original_sender")
     val originalSender: String? = null,
+    
+    @SerialName("is_private")
     val isPrivate: Boolean = false,
+    
+    @SerialName("recipient_nickname")
     val recipientNickname: String? = null,
+    
+    @SerialName("sender_peer_id")
     val senderPeerID: String? = null,
+    
     val mentions: List<String>? = null,
+    
     val channel: String? = null,
+    
+    @Transient // Not stored in Supabase
     val encryptedContent: ByteArray? = null,
+    
+    @SerialName("is_encrypted")
     val isEncrypted: Boolean = false,
+    
+    @Transient // Not stored in Supabase
     val deliveryStatus: DeliveryStatus? = null,
+    
+    @Transient // Not stored in Supabase
     val powDifficulty: Int? = null,
+    
     // SafeRelay emergency fields (iOS-compatible)
+    @SerialName("emergency_type")
     val emergencyType: EmergencyMessageType = EmergencyMessageType.NORMAL,
+    
+    @SerialName("priority_level")
     val priorityLevel: PriorityLevel = PriorityLevel.INFO,
+    
+    @Transient // Flattened for Supabase
     val geoLocation: GeoLocation? = null,
-    val isVerified: Boolean = true
+    
+    @SerialName("is_verified")
+    val isVerified: Boolean = true,
+    
+    // Supabase flattened location and extra fields
+    val latitude: Double? = geoLocation?.latitude,
+    val longitude: Double? = geoLocation?.longitude,
+    
+    @SerialName("battery_level")
+    val batteryLevel: Int? = null,
+    
+    @SerialName("report_category")
+    val reportCategory: String? = null
 ) : Parcelable {
 
     /**
