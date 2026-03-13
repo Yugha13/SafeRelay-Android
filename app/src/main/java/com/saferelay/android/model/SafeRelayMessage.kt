@@ -93,11 +93,13 @@ data class SafeRelayMessage(
     @SerialName("sender_nickname")
     val sender: String,
     
+    @SerialName("text")
     val content: String,
     
     @SerialName("message_type")
     val type: SafeRelayMessageType = SafeRelayMessageType.Message,
     
+    @SerialName("triggered_at")
     @Serializable(with = DateSerializer::class)
     val timestamp: Date,
     
@@ -146,10 +148,13 @@ data class SafeRelayMessage(
     val isVerified: Boolean = true,
     
     // Supabase flattened location and extra fields
+    @SerialName("trigger_latitude")
     val latitude: Double? = geoLocation?.latitude,
+    
+    @SerialName("trigger_longitude")
     val longitude: Double? = geoLocation?.longitude,
     
-    @SerialName("battery_level")
+    @SerialName("trigger_battery")
     val batteryLevel: Int? = null,
     
     @SerialName("report_category")

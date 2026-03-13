@@ -7,6 +7,8 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.serializer.KotlinXSerializer
+import kotlinx.serialization.json.Json
 
 /**
  * Singleton module to provide SupabaseClient.
@@ -33,6 +35,12 @@ object SupabaseModule {
                 install(Auth)
                 install(Realtime)
                 install(Storage)
+                
+                defaultSerializer = KotlinXSerializer(Json {
+                    ignoreUnknownKeys = true
+                    encodeDefaults = true
+                    coerceInputValues = true
+                })
             }
             android.util.Log.i("SupabaseModule", "SupabaseClient initialized successfully.")
         } catch (e: Exception) {
