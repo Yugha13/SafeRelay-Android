@@ -77,12 +77,17 @@ object SosSyncWorker {
                 try {
                     client.postgrest
                         .from(AppConstants.SosRelay.SUPABASE_TABLE)
-                        .insert(payload)
+                        .upsert(payload)
                     uploaded++
                     Log.d(TAG, "Uploaded SOS ${payload.sosId.take(8)} (hop=${payload.hopCount})")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to upload SOS ${payload.sosId.take(8)}: ${e.message}")
-                    sosRelayManager.pendingUploads.add(payload)
+                    val msg = e.message ?: ""
+                    if (msg.contains("duplicate") || msg.contains("23505") || msg.contains("conflict", ignoreCase = true)) {
+                        Log.d(TAG, "SOS ${payload.sosId.take(8)} already in Supabase, dropping from queue")
+                    } else {
+                        Log.w(TAG, "Failed to upload SOS ${payload.sosId.take(8)}: $msg")
+                        sosRelayManager.pendingUploads.add(payload)
+                    }
                 }
             }
 

@@ -22,7 +22,7 @@ import com.saferelay.android.protocol.SafeRelayPacket
 import com.saferelay.android.net.SupabaseModule
 import io.github.jan.supabase.postgrest.postgrest
 
-
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.saferelay.android.util.NotificationIntervalManager
 import kotlinx.coroutines.delay
@@ -263,6 +263,41 @@ class ChatViewModel(
                     com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
                 }
             } catch (_: Exception) { }
+        }
+        
+        // Poll Supabase for SOS alerts to ensure cross-device consistency over internet
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // Only care about SOS in the last 30 minutes
+            var lastTimestamp = System.currentTimeMillis() - com.saferelay.android.util.AppConstants.SosRelay.SOS_EXPIRY_MS
+            val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
+            format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            
+            while (isActive) {
+                try {
+                    val client = com.saferelay.android.net.SupabaseModule.getClient()
+                    if (client != null) {
+                        val isoTime = format.format(java.util.Date(lastTimestamp))
+                        val alerts = client.postgrest
+                            .from(com.saferelay.android.util.AppConstants.SosRelay.SUPABASE_TABLE)
+                            .select {
+                                filter {
+                                    gt("triggered_at", isoTime)
+                                }
+                            }.decodeList<com.saferelay.android.model.SosRelayPayload>()
+
+                        alerts.forEach { payload ->
+                            if (payload.timestampMs > lastTimestamp) {
+                                lastTimestamp = payload.timestampMs
+                            }
+                            // Process as if received from mesh
+                            meshService.sosRelayManager.onSosReceived(payload)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Supabase SOS polling error: ${e.message}")
+                }
+                kotlinx.coroutines.delay(10000) // Poll every 10 seconds
+            }
         }
         
         // Removed background location notes subscription. Notes now load only when sheet opens.
@@ -644,7 +679,7 @@ class ChatViewModel(
                         if (client != null) {
                             client.postgrest
                                 .from(com.saferelay.android.util.AppConstants.SosRelay.SUPABASE_TABLE)
-                                .insert(relayPayload)
+                                .upsert(relayPayload)
                             Log.i(TAG, "✅ SOS uploaded directly to Supabase: ${relayPayload.sosId.take(8)}")
                         } else {
                             Log.w(TAG, "Supabase client null — SOS queued for later upload")

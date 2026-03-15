@@ -603,8 +603,8 @@ fun StatusTab(
                                             sosHoldProgress = (elapsed / 3000f).coerceIn(0f, 1f)
                                             if (sosHoldProgress >= 1f) {
                                                 isSendingSos = true
-                                                val geo = getLastLocation(context)
-                                                val bat = getBatteryPercent(context)
+                                                val geo = getLastLocationAsync(context)
+                                                val bat = getBatteryPercentAsync(context)
                                                 val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                                                 viewModel.sendEmergencyMessage(msg)
                                                 SosManager.triggerSosHaptic(context)
@@ -725,12 +725,15 @@ fun StatusTab(
                     onClick = {
                         showRePushSosDialog = false
                         isSendingSos = true
-                        val geo = getLastLocation(context)
-                        val bat = getBatteryPercent(context)
-                        val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
-                        viewModel.sendEmergencyMessage(msg)
-                        SosManager.triggerSosHaptic(context)
-                        scope.launch { delay(2000); isSendingSos = false }
+                        scope.launch {
+                            val geo = getLastLocationAsync(context)
+                            val bat = getBatteryPercentAsync(context)
+                            val msg = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
+                            viewModel.sendEmergencyMessage(msg)
+                            SosManager.triggerSosHaptic(context)
+                            delay(2000)
+                            isSendingSos = false
+                        }
                     }
                 ) {
                     Text("Push Again", color = SOSRed)
@@ -749,11 +752,12 @@ fun StatusTab(
             onDismiss = { showCancelSosDialog = false },
             onConfirm = {
                 showCancelSosDialog = false
-                val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
-                val geo = getLastLocation(context)
-                val msg = SafeRelayMessage(
-                    sender = viewModel.myNickname,
-                    content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
+                scope.launch {
+                    val name = if (profile.fullName.isBlank()) viewModel.myNickname else profile.fullName
+                    val geo = getLastLocationAsync(context)
+                    val msg = SafeRelayMessage(
+                        sender = viewModel.myNickname,
+                        content = "✅ SAFE: @${viewModel.myNickname} ($name) is SAFE.",
                     type = SafeRelayMessageType.Message,
                     timestamp = java.util.Date(),
                     emergencyType = EmergencyMessageType.SAFE_STATUS,
@@ -761,6 +765,7 @@ fun StatusTab(
                     geoLocation = geo
                 )
                 viewModel.sendEmergencyMessage(msg)
+                }
             }
         )
     }
@@ -787,11 +792,12 @@ fun StatusTab(
             contactType = selectedEmergencyType,
             onSend = { text ->
                 showEmergencyMessageInputDialog = false
-                val geo = getLastLocation(context)
-                val bat = getBatteryPercent(context)
-                val msg = SafeRelayMessage(
-                    sender = viewModel.myNickname,
-                    content = "🚨 EMERGENCY REQUEST ($selectedEmergencyType):\n$text",
+                scope.launch {
+                    val geo = getLastLocationAsync(context)
+                    val bat = getBatteryPercentAsync(context)
+                    val msg = SafeRelayMessage(
+                        sender = viewModel.myNickname,
+                        content = "🚨 EMERGENCY REQUEST ($selectedEmergencyType):\n$text",
                     type = SafeRelayMessageType.Message,
                     timestamp = java.util.Date(),
                     emergencyType = EmergencyMessageType.SOS,
@@ -800,6 +806,7 @@ fun StatusTab(
                 )
                 viewModel.sendEmergencyMessage(msg)
                 SosManager.triggerSosHaptic(context)
+                }
             },
             onDismiss = { showEmergencyMessageInputDialog = false }
         )
@@ -1392,8 +1399,8 @@ fun EmergencyFeedTab(messages: List<SafeRelayMessage>, viewModel: ChatViewModel)
                         val elapsed = System.currentTimeMillis() - start
                         sosProgress = (elapsed / 3000f).coerceIn(0f, 1f)
                         if (sosProgress >= 1f) {
-                            val geo = getLastLocation(context)
-                            val bat = getBatteryPercent(context)
+                            val geo = getLastLocationAsync(context)
+                            val bat = getBatteryPercentAsync(context)
                             val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                             viewModel.sendEmergencyMessage(sos)
                             SosManager.triggerSosHaptic(context)
@@ -1782,6 +1789,15 @@ fun getLastLocation(context: Context): GeoLocation? {
         }
         best?.let { GeoLocation(it.latitude, it.longitude) }
     } catch (_: Exception) { null }
+}
+
+suspend fun getBatteryPercentAsync(context: Context): Int = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    getBatteryPercent(context)
+}
+
+
+suspend fun getLastLocationAsync(context: Context): GeoLocation? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    getLastLocation(context)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

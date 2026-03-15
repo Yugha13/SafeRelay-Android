@@ -191,8 +191,8 @@ fun SafeRelayMessagingScreen(
                             val elapsed = System.currentTimeMillis() - start
                             sosProgress = (elapsed / 3000f).coerceIn(0f, 1f)
                             if (sosProgress >= 1f) {
-                                val geo = getLastLocation(context)
-                                val bat = getBatteryPercent(context)
+                                val geo = getLastLocationAsync(context)
+                                val bat = getBatteryPercentAsync(context)
                                 val sos = SosManager.buildSosMessage(viewModel.myNickname, geo, bat)
                                 viewModel.sendEmergencyMessage(sos)
                                 SosManager.triggerSosHaptic(context)

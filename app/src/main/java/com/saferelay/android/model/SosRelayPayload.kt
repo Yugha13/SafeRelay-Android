@@ -43,6 +43,7 @@ data class SosRelayPayload(
     @SerialName("trigger_battery")
     val batteryLevel: Int,
 
+    @Serializable(with = LongDateSerializer::class)
     @SerialName("triggered_at")
     val timestampMs: Long = System.currentTimeMillis(),
 
@@ -128,6 +129,26 @@ data class SosRelayPayload(
             } catch (e: Exception) {
                 null
             }
+        }
+    }
+}
+
+object LongDateSerializer : kotlinx.serialization.KSerializer<Long> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("LongDate", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: Long) {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
+        format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        encoder.encodeString(format.format(java.util.Date(value)))
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): Long {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
+        return try {
+            format.parse(decoder.decodeString())?.time ?: System.currentTimeMillis()
+        } catch(e: Exception) {
+            System.currentTimeMillis()
         }
     }
 }
