@@ -149,6 +149,7 @@ class PacketProcessor(private val myPeerID: String) {
             MessageType.LEAVE -> handleLeave(routed)
             MessageType.FRAGMENT -> handleFragment(routed)
             MessageType.REQUEST_SYNC -> handleRequestSync(routed)
+            MessageType.SOS_RELAY -> handleSosRelay(routed)
             else -> {
                 // Handle private packet types (address check required)
                 if (packetRelayManager.isPacketAddressedToMe(packet)) {
@@ -235,6 +236,15 @@ class PacketProcessor(private val myPeerID: String) {
         }
         
         // Fragment relay is now handled by centralized PacketRelayManager
+    }
+
+    /**
+     * Handle SOS relay message
+     */
+    private suspend fun handleSosRelay(routed: RoutedPacket) {
+        val peerID = routed.peerID ?: "unknown"
+        Log.d(TAG, "Processing SOS_RELAY from ${formatPeerForLog(peerID)}")
+        delegate?.handleSosRelay(routed)
     }
 
     /**
@@ -325,4 +335,5 @@ interface PacketProcessorDelegate {
     fun sendCachedMessages(peerID: String)
     fun relayPacket(routed: RoutedPacket)
     fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean
+    fun handleSosRelay(routed: RoutedPacket)
 }

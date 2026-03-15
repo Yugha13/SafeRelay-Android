@@ -99,4 +99,22 @@ object SosManager {
      */
     fun SafeRelayMessage.isSosAlert(): Boolean =
         emergencyType == EmergencyMessageType.SOS && priorityLevel == PriorityLevel.CRITICAL
+
+    /**
+     * Build a compact SOS relay payload for mesh store-and-forward.
+     */
+    fun buildSosRelayPayload(
+        senderNickname: String,
+        senderPeerID: String,
+        location: GeoLocation?,
+        batteryPercent: Int
+    ): com.saferelay.android.model.SosRelayPayload {
+        return com.saferelay.android.model.SosRelayPayload(
+            senderNickname = senderNickname,
+            senderPeerID = senderPeerID,
+            latitude = location?.latitude ?: 0.0,
+            longitude = location?.longitude ?: 0.0,
+            batteryLevel = batteryPercent
+        )
+    }
 }

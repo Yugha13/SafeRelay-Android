@@ -14,6 +14,9 @@ import com.saferelay.android.mesh.BluetoothMeshService
 import com.saferelay.android.service.MeshServiceHolder
 import com.saferelay.android.model.SafeRelayMessage
 import com.saferelay.android.model.SafeRelayMessageType
+import com.saferelay.android.model.EmergencyMessageType
+import com.saferelay.android.model.PriorityLevel
+import com.saferelay.android.model.GeoLocation
 import com.saferelay.android.nostr.NostrIdentityBridge
 import com.saferelay.android.protocol.SafeRelayPacket
 import com.saferelay.android.net.SupabaseModule
@@ -232,6 +235,34 @@ class ChatViewModel(
             com.saferelay.android.mesh.TransferProgressManager.events.collect { evt ->
                 mediaSendingManager.handleTransferProgressEvent(evt)
             }
+        }
+        
+        // Subscribe to incoming SOS relay alerts from the mesh
+        viewModelScope.launch {
+            try {
+                meshService.sosRelayManager.incomingSosAlerts.collect { payload ->
+                    // Skip our own SOS
+                    if (payload.senderPeerID == meshService.myPeerID) return@collect
+
+                    // Convert relayed SOS payload to SafeRelayMessage for UI display
+                    val message = SafeRelayMessage(
+                        id = payload.sosId,
+                        sender = payload.senderNickname,
+                        content = "🆘 SOS EMERGENCY (Relayed)\nSender: @${payload.senderNickname}\nBattery: ${payload.batteryLevel}%\n📍 GPS: ${payload.latitude}, ${payload.longitude}\nHops: ${payload.hopCount}",
+                        timestamp = java.util.Date(payload.timestampMs),
+                        isRelay = true,
+                        emergencyType = EmergencyMessageType.SOS,
+                        priorityLevel = PriorityLevel.CRITICAL,
+                        geoLocation = GeoLocation(payload.latitude, payload.longitude),
+                        batteryLevel = payload.batteryLevel,
+                        senderPeerID = payload.senderPeerID
+                    )
+                    messageManager.addMessage(message)
+
+                    // Try to upload if we have internet
+                    com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
+                }
+            } catch (_: Exception) { }
         }
         
         // Removed background location notes subscription. Notes now load only when sheet opens.
@@ -595,13 +626,46 @@ class ChatViewModel(
             // Broadcast via mesh with no channel filter so it propagates to all nodes
             meshService.sendMessage(message.content, emptyList(), null)
 
-            // Sync to Supabase
-            viewModelScope.launch {
-                try {
-                    SupabaseModule.getClient()?.postgrest?.from("messages")?.insert(message)
-                    Log.d(TAG, "Successfully synced emergency message to Supabase: ${message.id}")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to sync emergency message to Supabase: ${e.message}")
+            // Trigger SOS relay store-and-forward pipeline
+            if (message.emergencyType == com.saferelay.android.model.EmergencyMessageType.SOS) {
+                val relayPayload = SosManager.buildSosRelayPayload(
+                    senderNickname = message.sender,
+                    senderPeerID = meshService.myPeerID,
+                    location = message.geoLocation,
+                    batteryPercent = message.batteryLevel ?: 100
+                )
+                // Broadcast SOS over BLE mesh for relay
+                meshService.triggerSos(relayPayload)
+
+                // Direct upload to Supabase sos_alerts table (fast path)
+                viewModelScope.launch {
+                    try {
+                        val client = SupabaseModule.getClient()
+                        if (client != null) {
+                            client.postgrest
+                                .from(com.saferelay.android.util.AppConstants.SosRelay.SUPABASE_TABLE)
+                                .insert(relayPayload)
+                            Log.i(TAG, "✅ SOS uploaded directly to Supabase: ${relayPayload.sosId.take(8)}")
+                        } else {
+                            Log.w(TAG, "Supabase client null — SOS queued for later upload")
+                            // Will be picked up by SosSyncWorker when internet is available
+                            com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Direct SOS upload failed (${e.message}) — queued for retry")
+                        // Already in SosRelayManager queue from triggerSos → SosSyncWorker will retry
+                        com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
+                    }
+                }
+            } else {
+                // Non-SOS emergency messages (SAFE_STATUS, etc.) → sync to messages table
+                viewModelScope.launch {
+                    try {
+                        SupabaseModule.getClient()?.postgrest?.from("messages")?.insert(message)
+                        Log.d(TAG, "Synced emergency message to Supabase: ${message.id}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to sync emergency message: ${e.message}")
+                    }
                 }
             }
         } catch (e: Exception) {

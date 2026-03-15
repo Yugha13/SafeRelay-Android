@@ -73,6 +73,13 @@ object AppConstants {
         const val CLEANUP_INTERVAL_MS: Long = 600_000L
     }
 
+    object SosRelay {
+        const val MAX_RELAY_HOPS: Int = 20
+        const val MAX_QUEUE_SIZE: Int = 100
+        const val SOS_EXPIRY_MS: Long = 86_400_000L // 24 hours
+        const val SUPABASE_TABLE: String = "sos_alerts"
+    }
+
     object Power {
         const val CRITICAL_BATTERY_PERCENT: Int = 10
         const val LOW_BATTERY_PERCENT: Int = 20

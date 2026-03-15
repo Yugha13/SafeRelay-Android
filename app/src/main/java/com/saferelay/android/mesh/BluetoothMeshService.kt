@@ -54,6 +54,8 @@ class BluetoothMeshService(private val context: Context) {
     private val messageHandler = MessageHandler(myPeerID, context.applicationContext)
     internal val connectionManager = BluetoothConnectionManager(context, myPeerID, fragmentManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID)
+    /** SOS store-and-forward relay manager. Public for SosSyncWorker access. */
+    val sosRelayManager = SosRelayManager(myPeerID)
     private lateinit var gossipSyncManager: GossipSyncManager
     // Service-level notification manager for background (no-UI) DMs
     private val serviceNotificationManager = com.saferelay.android.ui.NotificationManager(
@@ -241,6 +243,13 @@ class BluetoothMeshService(private val context: Context) {
             }
             
             override fun sendPacket(packet: SafeRelayPacket) {
+                connectionManager.broadcastPacket(RoutedPacket(packet))
+            }
+        }
+        
+        // SosRelayManager delegate
+        sosRelayManager.delegate = object : SosRelayDelegate {
+            override fun broadcastSosPacket(packet: SafeRelayPacket) {
                 connectionManager.broadcastPacket(RoutedPacket(packet))
             }
         }
@@ -551,6 +560,15 @@ class BluetoothMeshService(private val context: Context) {
                 val req = RequestSyncPacket.decode(routed.packet.payload) ?: return
                 gossipSyncManager.handleRequestSync(fromPeer, req)
             }
+
+            override fun handleSosRelay(routed: RoutedPacket) {
+                val payload = com.saferelay.android.model.SosRelayPayload.decode(routed.packet.payload)
+                if (payload != null) {
+                    sosRelayManager.onSosReceived(payload)
+                } else {
+                    Log.w(TAG, "Failed to decode SOS_RELAY payload")
+                }
+            }
         }
         
         // BluetoothConnectionManager delegates
@@ -697,6 +715,13 @@ class BluetoothMeshService(private val context: Context) {
         return reusable
     }
     
+    /**
+     * Trigger an SOS relay broadcast. Called by the ViewModel/SosManager.
+     */
+    fun triggerSos(payload: com.saferelay.android.model.SosRelayPayload) {
+        sosRelayManager.triggerSos(payload)
+    }
+
     /**
      * Send public message
      */

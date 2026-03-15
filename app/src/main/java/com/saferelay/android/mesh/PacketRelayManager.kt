@@ -132,6 +132,12 @@ class PacketRelayManager(private val myPeerID: String) {
      * Determine if we should relay this packet based on type and network conditions
      */
     private fun shouldRelayPacket(packet: SafeRelayPacket, fromPeerID: String): Boolean {
+        // SOS_RELAY always relays – emergency traffic must never be dropped
+        if (MessageType.fromValue(packet.type) == MessageType.SOS_RELAY) {
+            Log.d(TAG, "SOS_RELAY packet – always relay")
+            return true
+        }
+        
         // Always relay if TTL is high enough (indicates important message)
         if (packet.ttl >= 4u) {
             Log.d(TAG, "High TTL (${packet.ttl}), relaying")
