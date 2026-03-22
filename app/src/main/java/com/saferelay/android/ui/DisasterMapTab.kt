@@ -128,15 +128,26 @@ fun DisasterMapTab(
         )
         val coroutineScope = rememberCoroutineScope()
 
-        // Auto-zoom to current location once it's available
-        LaunchedEffect(myLocation) {
-            myLocation?.let { loc ->
+        // Auto-zoom to SOS or current location once it's available
+        LaunchedEffect(myLocation, filteredSosMessages.size) {
+            val targetSos = filteredSosMessages.lastOrNull { it.geoLocation != null }
+            if (targetSos?.geoLocation != null) {
                 cameraState.animateTo(
                     finalPosition = CameraPosition(
-                        target = Position(loc.longitude, loc.latitude),
+                        target = Position(targetSos.geoLocation.longitude, targetSos.geoLocation.latitude),
                         zoom = 14.0
                     )
                 )
+            } else {
+                val loc = myLocation
+                if (loc != null) {
+                    cameraState.animateTo(
+                        finalPosition = CameraPosition(
+                            target = Position(loc.longitude, loc.latitude),
+                            zoom = 14.0
+                        )
+                    )
+                }
             }
         }
 
@@ -448,10 +459,12 @@ fun SOSMarkerMap(
                                    else if (msg.content.contains("Suspicious Activity")) "👁️"
                                    else msg.emergencyType.emoji
 
+                        val pinEmoji = "📍 $emoji"
+
                         Feature(
                             geometry = Point(longitude = geo.longitude, latitude = geo.latitude),
                             properties = buildJsonObject {
-                                put("emoji", JsonPrimitive(emoji))
+                                put("emoji", JsonPrimitive(pinEmoji))
                                 put("id", JsonPrimitive(msg.id))
                             }
                         )
@@ -542,17 +555,18 @@ fun SOSMarkerMap(
 }
 
 private fun soupCameraPosition(messages: List<SafeRelayMessage>, myLocation: Location?): CameraPosition {
-    val firstMsg = messages.firstOrNull { it.geoLocation != null }
-    val target = if (myLocation != null) {
+    val targetSos = messages.lastOrNull { it.geoLocation != null }
+    val target = if (targetSos?.geoLocation != null) {
+        Position(targetSos.geoLocation.longitude, targetSos.geoLocation.latitude)
+    } else if (myLocation != null) {
         Position(myLocation.longitude, myLocation.latitude)
     } else {
-        // Default to a neutral global view or a specific region if no location/messages
-        firstMsg?.geoLocation?.let { Position(it.longitude, it.latitude) } ?: Position(0.0, 0.0)
+        Position(0.0, 0.0)
     }
     
     return CameraPosition(
         target = target,
-        zoom = if (myLocation != null) 14.0 else if (firstMsg != null) 12.0 else 2.0
+        zoom = 14.0
     )
 }
 
