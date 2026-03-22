@@ -98,6 +98,7 @@ fun DisasterMapTab(
                              msg.content.contains("🚨 [")
             
             if (!isIncident) return@filter false
+            if (msg.sender == myNickname) return@filter false
             
             // Radius filter
             val loc = msg.geoLocation ?: return@filter true 

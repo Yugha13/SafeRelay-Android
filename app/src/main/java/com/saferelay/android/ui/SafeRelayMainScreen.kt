@@ -163,6 +163,18 @@ fun SafeRelayMainScreen(
         }
     }
 
+    // Map Unread Sos logic
+    var lastSeenSosId by remember { mutableStateOf<String?>(null) }
+    val latestMapSos = remember(messages) { messages.lastOrNull { it.isSosAlert() && it.sender != viewModel.myNickname } }
+    val hasUnreadSos = remember(latestMapSos, lastSeenSosId, selectedTab) {
+        if (selectedTab == SafeRelayTab.MAP) false else latestMapSos != null && latestMapSos.id != lastSeenSosId
+    }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == SafeRelayTab.MAP && latestMapSos != null) {
+            lastSeenSosId = latestMapSos.id
+        }
+    }
+
     // Use statusBarsPadding + imePadding at root level
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -249,12 +261,27 @@ fun SafeRelayMainScreen(
                             selected = selected,
                             onClick = { selectedTab = tab },
                             icon = {
-                                Icon(
-                                    tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = if (selected) BrandPurple else Color(0xFF9CA3AF),
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                if (tab == SafeRelayTab.MAP && hasUnreadSos) {
+                                    androidx.compose.material3.BadgedBox(
+                                        badge = {
+                                            Box(modifier = Modifier.size(8.dp).background(SOSRed, CircleShape))
+                                        }
+                                    ) {
+                                        Icon(
+                                            tab.icon,
+                                            contentDescription = tab.label,
+                                            tint = if (selected) BrandPurple else Color(0xFF9CA3AF),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = if (selected) BrandPurple else Color(0xFF9CA3AF),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             },
                             label = {
                                 Text(
