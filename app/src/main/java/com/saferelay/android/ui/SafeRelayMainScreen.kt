@@ -1361,7 +1361,8 @@ fun EmergencyFeedTab(messages: List<SafeRelayMessage>, viewModel: ChatViewModel)
                     state = listState,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    reverseLayout = true
                 ) {
                     items(sorted, key = { it.id }) { msg ->
                         EmergencyFeedCard(message = msg)
@@ -1456,8 +1457,8 @@ fun EmergencyFeedCard(message: SafeRelayMessage) {
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = when (message.priorityLevel) {
-                PriorityLevel.CRITICAL -> Color(0xFF1A0000)
-                PriorityLevel.URGENT -> Color(0xFF1A0D00)
+                PriorityLevel.CRITICAL -> Color(0xFFFFEBEE)
+                PriorityLevel.URGENT -> Color(0xFFFFF3E0)
                 PriorityLevel.INFO -> CardBg
             }
         )
@@ -1490,7 +1491,7 @@ fun EmergencyFeedCard(message: SafeRelayMessage) {
                 }
                 Spacer(Modifier.height(5.dp))
                 Text(message.content, fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace, color = Color(0xFFDDDDDD), lineHeight = 18.sp)
+                    fontFamily = FontFamily.Monospace, color = Color(0xFF1A1A1A), lineHeight = 18.sp)
                 message.geoLocation?.let { geo ->
                     Spacer(Modifier.height(3.dp))
                     Text("📍 ${String.format("%.4f", geo.latitude)}, ${String.format("%.4f", geo.longitude)}",
@@ -1517,7 +1518,7 @@ private fun FeedInputBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF0A0A0A))
+            .background(Color.White)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1525,16 +1526,16 @@ private fun FeedInputBar(
             value = text,
             onValueChange = onTextChange,
             placeholder = {
-                Text("type message…", color = Color(0xFF444444),
+                Text("type message…", color = Color.Gray,
                     fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             },
             modifier = Modifier.weight(1f),
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = Color(0xFF2A2A2A),
+                unfocusedBorderColor = Color(0xFFE0E0E0),
                 focusedBorderColor = SOSRed.copy(alpha = 0.5f),
                 cursorColor = SOSRed,
-                unfocusedTextColor = Color(0xFFCCCCCC),
-                focusedTextColor = Color.White
+                unfocusedTextColor = Color.Black,
+                focusedTextColor = Color.Black
             ),
             shape = RoundedCornerShape(22.dp),
             textStyle = androidx.compose.ui.text.TextStyle(

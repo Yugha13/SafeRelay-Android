@@ -100,7 +100,7 @@ fun SafeRelayMessagingScreen(
 
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+        if (messages.isNotEmpty()) listState.animateScrollToItem(0)
     }
 
     Surface(
@@ -123,9 +123,10 @@ fun SafeRelayMessagingScreen(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                reverseLayout = true
             ) {
-                items(messages, key = { it.id }) { msg ->
+                items(messages.reversed(), key = { it.id }) { msg ->
                     val isOwn = msg.sender == myNickname || msg.sender == "me"
                     MessageBubble(message = msg, isOwn = isOwn)
                 }
@@ -292,12 +293,12 @@ private fun MessageBubble(message: SafeRelayMessage, isOwn: Boolean) {
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF1A1A1A))
-                        .border(0.5.dp, Color(0xFF2A2A2A), CircleShape),
+                        .background(Color(0xFFE8F4F8)) // light theme friendly blue-ish
+                        .border(0.5.dp, Color(0xFFB3E5FC), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(message.sender.take(1).uppercase(), fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold, color = Color(0xFF888888))
+                        fontWeight = FontWeight.Bold, color = Color(0xFF0288D1)) // nice dark blue text
                 }
                 Spacer(Modifier.width(6.dp))
             }
