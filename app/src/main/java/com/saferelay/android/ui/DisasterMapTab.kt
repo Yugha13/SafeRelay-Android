@@ -92,9 +92,10 @@ fun DisasterMapTab(
     
     val filteredSosMessages = remember(messages, myNickname, myLocation, selectedFilter) {
         messages.filter { msg ->
-            // Base filter: Include SOS, Reports, and Admin Disasters
+            if (msg.emergencyType == EmergencyMessageType.SOS || msg.priorityLevel == PriorityLevel.CRITICAL) return@filter false
+            
+            // Base filter: Include Reports, and Admin Disasters
             val isIncident = (msg.emergencyType != EmergencyMessageType.NORMAL && msg.emergencyType != EmergencyMessageType.SAFE_STATUS) || 
-                             msg.priorityLevel == PriorityLevel.CRITICAL ||
                              msg.content.contains("🚨 [")
             
             if (!isIncident) return@filter false

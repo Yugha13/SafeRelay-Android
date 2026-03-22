@@ -166,11 +166,11 @@ fun SafeRelayMainScreen(
     // Map Unread Sos logic
     var lastSeenSosId by remember { mutableStateOf<String?>(null) }
     val latestMapSos = remember(messages) { messages.lastOrNull { it.isSosAlert() && it.sender != viewModel.myNickname } }
-    val hasUnreadSos = remember(latestMapSos, lastSeenSosId, selectedTab) {
-        if (selectedTab == SafeRelayTab.MAP) false else latestMapSos != null && latestMapSos.id != lastSeenSosId
+    val hasUnreadSos = remember(latestMapSos, lastSeenSosId, showDisasterMap) {
+        if (showDisasterMap) false else latestMapSos != null && latestMapSos.id != lastSeenSosId
     }
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == SafeRelayTab.MAP && latestMapSos != null) {
+    LaunchedEffect(showDisasterMap) {
+        if (showDisasterMap && latestMapSos != null) {
             lastSeenSosId = latestMapSos.id
         }
     }
@@ -197,6 +197,7 @@ fun SafeRelayMainScreen(
                     title = headerTitle,
                     profile = profile,
                     connectedPeerCount = connectedPeers.size,
+                    hasUnreadSos = hasUnreadSos,
                     onMapClick = { showDisasterMap = true },
                     onProfileClick = { selectedTab = SafeRelayTab.PROFILE }, // Profile restored
                     onBrandClick = { selectedTab = SafeRelayTab.HOME }
@@ -209,8 +210,9 @@ fun SafeRelayMainScreen(
                     SafeRelayTab.HOME -> StatusTab(
                         viewModel = viewModel,
                         profile = profile,
+                        hasUnreadSos = hasUnreadSos,
                         onProfileClick = { selectedTab = SafeRelayTab.PROFILE },
-                        onMapClick = { selectedTab = SafeRelayTab.MAP },
+                        onMapClick = { showDisasterMap = true },
                         onReportClick = { showReportCategorySheet = true } // Report via sheet now
                     )
                     SafeRelayTab.MESSAGES -> {
@@ -379,6 +381,7 @@ private fun SafeRelayHeader(
     title: String,
     profile: UserProfile,
     connectedPeerCount: Int,
+    hasUnreadSos: Boolean,
     onMapClick: () -> Unit,
     onProfileClick: () -> Unit,
     onBrandClick: () -> Unit
@@ -433,11 +436,15 @@ private fun SafeRelayHeader(
             Spacer(Modifier.width(12.dp))
 
             IconButton(onClick = onMapClick) {
-                Icon(
-                    Icons.Filled.Map,
-                    contentDescription = "Map",
-                    tint = Color(0xFF6B7280)
-                )
+                if (hasUnreadSos) {
+                    androidx.compose.material3.BadgedBox(
+                        badge = { androidx.compose.foundation.layout.Box(modifier = Modifier.size(8.dp).background(SOSRed, CircleShape)) }
+                    ) {
+                        Icon(Icons.Filled.Map, contentDescription = "Map", tint = Color(0xFF6B7280))
+                    }
+                } else {
+                    Icon(Icons.Filled.Map, contentDescription = "Map", tint = Color(0xFF6B7280))
+                }
             }
         }
     }
@@ -450,6 +457,7 @@ private fun SafeRelayHeader(
 fun StatusTab(
     viewModel: ChatViewModel,
     profile: UserProfile,
+    hasUnreadSos: Boolean,
     onProfileClick: () -> Unit = {},
     onMapClick: () -> Unit = {},
     onReportClick: () -> Unit = {}
@@ -544,7 +552,15 @@ fun StatusTab(
                         modifier = Modifier.size(40.dp).clickable { onMapClick() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Map, null, tint = MeshBlue, modifier = Modifier.size(20.dp))
+                            if (hasUnreadSos) {
+                                androidx.compose.material3.BadgedBox(
+                                    badge = { androidx.compose.foundation.layout.Box(modifier = Modifier.size(8.dp).background(SOSRed, CircleShape)) }
+                                ) {
+                                    Icon(Icons.Default.Map, null, tint = MeshBlue, modifier = Modifier.size(20.dp))
+                                }
+                            } else {
+                                Icon(Icons.Default.Map, null, tint = MeshBlue, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
 
