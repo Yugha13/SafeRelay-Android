@@ -520,16 +520,7 @@ fun StatusTab(
                             Icon(Icons.Default.Map, null, tint = MeshBlue, modifier = Modifier.size(20.dp))
                         }
                     }
-                    // Notifications Button
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFFF3F4F6),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Notifications, null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                        }
-                    }
+
                 }
             }
 
