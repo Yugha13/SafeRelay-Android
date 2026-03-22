@@ -1459,7 +1459,7 @@ fun EmergencyFeedCard(message: SafeRelayMessage) {
             containerColor = when (message.priorityLevel) {
                 PriorityLevel.CRITICAL -> Color(0xFFFFEBEE)
                 PriorityLevel.URGENT -> Color(0xFFFFF3E0)
-                PriorityLevel.INFO -> CardBg
+                PriorityLevel.INFO -> Color.White
             }
         )
     ) {
