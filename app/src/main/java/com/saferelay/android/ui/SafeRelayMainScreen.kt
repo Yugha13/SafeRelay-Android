@@ -631,6 +631,11 @@ fun StatusTab(
                                         return@detectTapGestures
                                     }
                                     if (isSendingSos) return@detectTapGestures
+                                    
+                                    if (viewModel.isSosCooldownActive()) {
+                                        android.widget.Toast.makeText(context, "SOS Cooldown: ${viewModel.getRemainingSosCooldown()}s remaining", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@detectTapGestures
+                                    }
 
                                     isHoldingSosButton = true
                                     val startTime = System.currentTimeMillis()
@@ -758,7 +763,11 @@ fun StatusTab(
             title = { Text("Already Pushed") },
             text = { Text("SOS is already pushed and waiting for response. Do you want to push again?") },
             confirmButton = {
+                val isCooldownActive = viewModel.isSosCooldownActive()
+                val cooldownSeconds = viewModel.getRemainingSosCooldown()
+                
                 TextButton(
+                    enabled = !isCooldownActive,
                     onClick = {
                         showRePushSosDialog = false
                         isSendingSos = true
@@ -773,7 +782,10 @@ fun StatusTab(
                         }
                     }
                 ) {
-                    Text("Push Again", color = SOSRed)
+                    Text(
+                        if (isCooldownActive) "Wait ${cooldownSeconds}s" else "Push Again",
+                        color = if (isCooldownActive) Color.Gray else SOSRed
+                    )
                 }
             },
             dismissButton = {
@@ -1430,6 +1442,10 @@ fun EmergencyFeedTab(messages: List<SafeRelayMessage>, viewModel: ChatViewModel)
             isHoldingSOS = isHoldingSOS,
             sosProgress = sosProgress,
             onSosHoldStart = {
+                if (viewModel.isSosCooldownActive()) {
+                    android.widget.Toast.makeText(context, "SOS Cooldown: ${viewModel.getRemainingSosCooldown()}s remaining", android.widget.Toast.LENGTH_SHORT).show()
+                    return@FeedInputBar
+                }
                 isHoldingSOS = true
                 scope.launch {
                     val start = System.currentTimeMillis()
