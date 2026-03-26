@@ -441,8 +441,7 @@ fun SOSMarkerMap(
                 cameraState = cameraState,
                 colors = LocationPuckColors(
                     dotFillColorCurrentLocation = com.saferelay.android.ui.MeshBlue,
-                    accuracyFillColor = com.saferelay.android.ui.MeshBlue.copy(alpha = 0.3f),
-                    puckShadow = Color.Black.copy(alpha = 0.2f)
+                    accuracyFillColor = com.saferelay.android.ui.MeshBlue.copy(alpha = 0.3f)
                 )
             )
 
