@@ -565,12 +565,13 @@ class LocationChannelManager private constructor(private val context: Context) {
      */
     private fun loadLocationServicesState() {
         try {
-            val enabled = dataManager?.isLocationServicesEnabled() ?: false
+            // Default to TRUE if not found (changed from false to improve UX/discoverability)
+            val enabled = dataManager?.isLocationServicesEnabled() ?: true
             _locationServicesEnabled.value = enabled
             Log.d(TAG, "Loaded location services state: $enabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load location services state: ${e.message}")
-            _locationServicesEnabled.value = false
+            _locationServicesEnabled.value = true // Safe default
         }
     }
 

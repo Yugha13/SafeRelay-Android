@@ -384,6 +384,7 @@ fun SOSMarkerMap(
     val context = LocalContext.current
     val locationManager = remember { com.saferelay.android.geohash.LocationChannelManager.getInstance(context) }
     val myLocation by locationManager.currentLocation.collectAsState()
+    val isLoadingLocation by locationManager.isLoadingLocation.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     
     // Bridge our location flow to MapLibre's LocationProvider
@@ -395,7 +396,7 @@ fun SOSMarkerMap(
                         position = Position(it.longitude, it.latitude),
                         accuracy = it.accuracy.toDouble(),
                         bearing = it.bearing.toDouble(),
-                        bearingAccuracy = null, // Android Location API doesn't guarantee bearing accuracy directly without SDK checks
+                        bearingAccuracy = null,
                         speed = it.speed.toDouble(),
                         speedAccuracy = null,
                         timestamp = TimeSource.Monotonic.markNow()
@@ -408,7 +409,6 @@ fun SOSMarkerMap(
     val userLocationState = org.maplibre.compose.location.rememberUserLocationState(locationProvider = mapLibreLocationProvider)
     val styleUri = "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb"
 
-
     // Keep location fresh while map is open
     DisposableEffect(Unit) {
         locationManager.beginLiveRefresh()
@@ -417,7 +417,11 @@ fun SOSMarkerMap(
         }
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF3F4F6)) // Light gray background to avoid "blank white" look
+    ) {
         MaplibreMap(
             modifier = Modifier.fillMaxSize(),
             cameraState = cameraState,
@@ -438,18 +442,11 @@ fun SOSMarkerMap(
                 colors = LocationPuckColors(
                     dotFillColorCurrentLocation = com.saferelay.android.ui.MeshBlue,
                     accuracyFillColor = com.saferelay.android.ui.MeshBlue.copy(alpha = 0.3f),
-                    accuracyStrokeColor = com.saferelay.android.ui.MeshBlue
-                ),
-                onClick = { event ->
-                    coroutineScope.launch {
-                        cameraState.animateTo(
-                            finalPosition = CameraPosition(target = event.position, zoom = 14.0)
-                        )
-                    }
-                }
+                    puckShadow = Color.Black.copy(alpha = 0.2f)
+                )
             )
 
-            // 2. Native SOS / Report / Disaster Markers
+            // 2. SOS / Report Markers
             if (sosMessages.isNotEmpty()) {
                 val features = sosMessages.mapNotNull { msg ->
                     msg.geoLocation?.let { geo ->
@@ -488,9 +485,7 @@ fun SOSMarkerMap(
                             val props = clickedFeatures.firstOrNull()?.properties?.let { 
                                 if (it is kotlinx.serialization.json.JsonObject) it else null 
                             }
-
                             val clickedId = props?.get("id")?.toString()?.trim('"')
-
                             if (clickedId != null) {
                                 val msg = sosMessages.find { it.id == clickedId }
                                 if (msg != null) onMarkerClick(msg)
@@ -502,7 +497,7 @@ fun SOSMarkerMap(
             }
         }
 
-        // Picking location overlay
+        // 3. UI Overlays
         if (isPickingLocation) {
             Box(
                 modifier = Modifier
@@ -527,15 +522,39 @@ fun SOSMarkerMap(
                 modifier = Modifier.align(Alignment.Center).size(32.dp)
             )
         }
+
+        // 4. Loading indicator
+        if (myLocation == null && isLoadingLocation) {
+            Box(
+                modifier = Modifier.align(Alignment.Center).padding(bottom = 40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = com.saferelay.android.ui.MeshBlue)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Finding your location...", fontSize = 12.sp, color = Color.DarkGray)
+                    }
+                }
+            }
+        }
         
-        // My Location Button
+        // 5. Locate Me FAB
         FloatingActionButton(
             onClick = {
                 myLocation?.let { loc ->
                     coroutineScope.launch {
-                        val pos = Position(loc.longitude, loc.latitude)
                         cameraState.animateTo(
-                            finalPosition = CameraPosition(target = pos, zoom = 14.0)
+                            finalPosition = CameraPosition(
+                                target = Position(loc.longitude, loc.latitude),
+                                zoom = 15.0
+                            )
                         )
                     }
                 }
@@ -543,14 +562,12 @@ fun SOSMarkerMap(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-                .padding(bottom = 90.dp), // Clear bottom nav
-            containerColor = Color(0xFF222222),
-            contentColor = Color.White
+                .padding(bottom = if (isPickingLocation) 0.dp else 80.dp), // Height adjustment for bottom nav
+            containerColor = Color.White,
+            contentColor = com.saferelay.android.ui.MeshBlue,
+            shape = CircleShape
         ) {
-            Icon(
-                imageVector = Icons.Filled.MyLocation,
-                contentDescription = "My Location"
-            )
+            Icon(Icons.Filled.MyLocation, "Locate Me")
         }
     }
 }
