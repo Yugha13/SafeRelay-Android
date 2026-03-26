@@ -116,6 +116,8 @@ fun SafeRelayMainScreen(
     var showDisasterMap by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     var showIncomingSosAlert by remember { mutableStateOf<SafeRelayMessage?>(null) }
+    // --- SOS Spam Prevention ---
+    val notifiedSosIds = remember { mutableStateOf(setOf<String>()) }
 
     // --- Reporting Flow State ---
     var showReportCategorySheet by remember { mutableStateOf(false) }
@@ -157,7 +159,8 @@ fun SafeRelayMainScreen(
 
     LaunchedEffect(messages) {
         val latestSos = messages.lastOrNull { it.isSosAlert() && it.sender != viewModel.myNickname }
-        if (latestSos != null && showIncomingSosAlert?.id != latestSos.id) {
+        if (latestSos != null && !notifiedSosIds.value.contains(latestSos.id)) {
+            notifiedSosIds.value = notifiedSosIds.value + latestSos.id
             showIncomingSosAlert = latestSos
             SosManager.triggerIncomingSosHaptic(context)
         }

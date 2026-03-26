@@ -191,6 +191,20 @@ class ChatViewModel(
     val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
     val teleportedGeo: StateFlow<Set<String>> = state.teleportedGeo
     val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
+    
+    // --- SOS Cooldown Logic ---
+    private var lastSosSentTimestamp = 0L
+
+    fun isSosCooldownActive(): Boolean {
+        val elapsed = System.currentTimeMillis() - lastSosSentTimestamp
+        return elapsed < SosManager.SOS_COOLDOWN_MS
+    }
+
+    fun getRemainingSosCooldown(): Int {
+        val elapsed = System.currentTimeMillis() - lastSosSentTimestamp
+        val remaining = SosManager.SOS_COOLDOWN_MS - elapsed
+        return (remaining / 1000).toInt().coerceAtLeast(0)
+    }
 
     init {
         // Note: Mesh service delegate is now set by MainActivity
@@ -656,6 +670,15 @@ class ChatViewModel(
      * Mirrors iOS SafeRelay viewModel.sendSOS().
      */
     fun sendEmergencyMessage(message: SafeRelayMessage) {
+        // Enforce SOS cooldown for actual SOS alerts (but not for SAFE status updates)
+        if (message.emergencyType == EmergencyMessageType.SOS) {
+            if (isSosCooldownActive()) {
+                Log.w("ChatViewModel", "SOS broadcast blocked by cooldown (${getRemainingSosCooldown()}s remaining)")
+                return
+            }
+            lastSosSentTimestamp = System.currentTimeMillis()
+        }
+
         try {
             messageManager.addMessage(message)
             // Broadcast via mesh with no channel filter so it propagates to all nodes
