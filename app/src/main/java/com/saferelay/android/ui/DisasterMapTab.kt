@@ -312,6 +312,19 @@ fun DisasterMapSheet(
             val cameraState = rememberCameraState(
                 firstPosition = soupCameraPosition(sosMessages, null)
             )
+
+            // Auto-pan to latest SOS when a new one arrives
+            LaunchedEffect(sosMessages.size) {
+                val latestSos = sosMessages.lastOrNull { it.geoLocation != null }
+                if (latestSos?.geoLocation != null) {
+                    cameraState.animateTo(
+                        finalPosition = CameraPosition(
+                            target = Position(latestSos.geoLocation.longitude, latestSos.geoLocation.latitude),
+                            zoom = 15.0
+                        )
+                    )
+                }
+            }
             SOSMarkerMap(
                 sosMessages = sosMessages,
                 modifier = Modifier.fillMaxSize(),
@@ -476,7 +489,11 @@ fun SOSMarkerMap(
                     id = "sos-markers",
                     source = source,
                     textField = format(span(feature["emoji"].asString())),
-                    textSize = const(2.2f.em),
+                    textSize = const(3.0f.em), // Larger for better visibility
+                    iconAllowOverlap = const(true),
+                    textAllowOverlap = const(true),
+                    iconIgnorePlacement = const(true),
+                    textIgnorePlacement = const(true),
                     onClick = { clickedFeatures ->
                         if (isPickingLocation) {
                             ClickResult.Pass
