@@ -21,6 +21,7 @@ import java.util.UUID
  * Attaches GPS location, battery %, and triggers haptic + alert sound.
  */
 object SosManager {
+    const val SOS_COOLDOWN_MS = 60000L // 60 seconds
 
     private var alertPlayer: MediaPlayer? = null
 
