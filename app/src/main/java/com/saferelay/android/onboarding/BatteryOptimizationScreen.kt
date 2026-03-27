@@ -32,16 +32,11 @@ fun BatteryOptimizationScreen(
     status: BatteryOptimizationStatus,
     onDisableBatteryOptimization: () -> Unit,
     onRetry: () -> Unit,
-    onSkip: () -> Unit,
     isLoading: Boolean = false
 ) {
     val context = LocalContext.current
     val colorScheme = MaterialTheme.colorScheme
     
-    // Initialize preference manager
-    LaunchedEffect(Unit) {
-        BatteryOptimizationPreferenceManager.init(context)
-    }
 
     Box(
         modifier = modifier.padding(24.dp),
@@ -52,7 +47,6 @@ fun BatteryOptimizationScreen(
                 BatteryOptimizationEnabledContent(
                     onDisableBatteryOptimization = onDisableBatteryOptimization,
                     onRetry = onRetry,
-                    onSkip = onSkip,
                     colorScheme = colorScheme,
                     isLoading = isLoading
                 )
@@ -78,7 +72,6 @@ fun BatteryOptimizationScreen(
 private fun BatteryOptimizationEnabledContent(
     onDisableBatteryOptimization: () -> Unit,
     onRetry: () -> Unit,
-    onSkip: () -> Unit,
     colorScheme: ColorScheme,
     isLoading: Boolean
 ) {
@@ -231,38 +224,17 @@ private fun BatteryOptimizationEnabledContent(
                 )
             }
             
-            Row(
+            OutlinedButton(
+                onClick = onRetry,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                enabled = !isLoading
             ) {
-                OutlinedButton(
-                    onClick = onRetry,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading
-                ) {
-                        Text(
-                            text = stringResource(R.string.check_again),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace
-                        )
+                    Text(
+                        text = stringResource(R.string.check_again),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace
                     )
-                }
-                
-                TextButton(
-                    onClick = {
-                        BatteryOptimizationPreferenceManager.setSkipped(context, true)
-                        onSkip()
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading
-                ) {
-                        Text(
-                            text = stringResource(R.string.battery_optimization_skip),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace
-                        )
-                    )
-                }
+                )
             }
         }
     }

@@ -23,9 +23,6 @@ import com.saferelay.android.onboarding.BluetoothCheckScreen
 import com.saferelay.android.onboarding.BluetoothStatus
 import com.saferelay.android.onboarding.BluetoothStatusManager
 import com.saferelay.android.onboarding.BatteryOptimizationManager
-import com.saferelay.android.onboarding.BatteryOptimizationPreferenceManager
-import com.saferelay.android.onboarding.BatteryOptimizationScreen
-import com.saferelay.android.onboarding.BatteryOptimizationStatus
 import com.saferelay.android.onboarding.BackgroundLocationPermissionScreen
 import com.saferelay.android.onboarding.InitializationErrorScreen
 import com.saferelay.android.onboarding.InitializingScreen
@@ -252,10 +249,6 @@ class MainActivity : OrientationAwareActivity() {
                     onRetry = {
                         checkBatteryOptimizationAndProceed()
                     },
-                    onSkip = {
-                        // Skip battery optimization and proceed
-                        proceedWithPermissionCheck()
-                    },
                     isLoading = isBatteryOptimizationLoading
                 )
             }
@@ -279,9 +272,6 @@ class MainActivity : OrientationAwareActivity() {
                     },
                     onRetry = {
                         onboardingCoordinator.checkBackgroundLocationAndProceed()
-                    },
-                    onSkip = {
-                        onboardingCoordinator.skipBackgroundLocation()
                     }
                 )
             }
@@ -431,8 +421,7 @@ class MainActivity : OrientationAwareActivity() {
             } else if (permissionManager.areRequiredPermissionsGranted()) {
                 Log.d("MainActivity", "Existing user with required permissions")
                 if (permissionManager.needsBackgroundLocationPermission() &&
-                    !permissionManager.isBackgroundLocationGranted() &&
-                    !com.saferelay.android.onboarding.BackgroundLocationPreferenceManager.isSkipped(this@MainActivity)
+                    !permissionManager.isBackgroundLocationGranted()
                 ) {
                     mainViewModel.updateOnboardingState(OnboardingState.BACKGROUND_LOCATION_EXPLANATION)
                 } else {

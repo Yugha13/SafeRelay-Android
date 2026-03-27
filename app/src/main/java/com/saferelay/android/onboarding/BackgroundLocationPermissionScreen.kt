@@ -42,8 +42,7 @@ import com.saferelay.android.R
 fun BackgroundLocationPermissionScreen(
     modifier: Modifier,
     onContinue: () -> Unit,
-    onRetry: () -> Unit,
-    onSkip: () -> Unit
+    onRetry: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val scrollState = rememberScrollState()
@@ -190,33 +189,16 @@ fun BackgroundLocationPermissionScreen(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                OutlinedButton(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
-                        onClick = onRetry,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.check_again),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = FontFamily.Monospace
-                            )
+                    Text(
+                        text = stringResource(R.string.check_again),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Monospace
                         )
-                    }
-
-                    TextButton(
-                        onClick = onSkip,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.battery_optimization_skip),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = FontFamily.Monospace
-                            )
-                        )
-                    }
+                    )
                 }
             }
         }

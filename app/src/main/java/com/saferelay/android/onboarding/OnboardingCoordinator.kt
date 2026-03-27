@@ -158,11 +158,6 @@ class OnboardingCoordinator(
         completeOnboarding()
     }
 
-    fun skipBackgroundLocation() {
-        Log.d(TAG, "User skipped background location permission")
-        BackgroundLocationPreferenceManager.setSkipped(activity, true)
-        completeOnboarding()
-    }
 
     fun checkBackgroundLocationAndProceed() {
         if (!shouldRequestBackgroundLocation()) {
@@ -172,8 +167,7 @@ class OnboardingCoordinator(
 
     private fun shouldRequestBackgroundLocation(): Boolean {
         return permissionManager.needsBackgroundLocationPermission() &&
-            !permissionManager.isBackgroundLocationGranted() &&
-            !BackgroundLocationPreferenceManager.isSkipped(activity)
+            !permissionManager.isBackgroundLocationGranted()
     }
 
     /**
