@@ -23,6 +23,8 @@ import com.saferelay.android.onboarding.BluetoothCheckScreen
 import com.saferelay.android.onboarding.BluetoothStatus
 import com.saferelay.android.onboarding.BluetoothStatusManager
 import com.saferelay.android.onboarding.BatteryOptimizationManager
+import com.saferelay.android.onboarding.BatteryOptimizationScreen
+import com.saferelay.android.onboarding.BatteryOptimizationStatus
 import com.saferelay.android.onboarding.BackgroundLocationPermissionScreen
 import com.saferelay.android.onboarding.InitializationErrorScreen
 import com.saferelay.android.onboarding.InitializingScreen
@@ -605,13 +607,6 @@ class MainActivity : OrientationAwareActivity() {
         // We'll check battery optimization after permissions are granted
         if (permissionManager.isFirstTimeLaunch()) {
             android.util.Log.d("MainActivity", "First-time launch, skipping battery optimization check - will check after permissions")
-            proceedWithPermissionCheck()
-            return
-        }
-        
-        // Check if user has previously skipped battery optimization
-        if (BatteryOptimizationPreferenceManager.isSkipped(this)) {
-            android.util.Log.d("MainActivity", "User previously skipped battery optimization, proceeding to permissions")
             proceedWithPermissionCheck()
             return
         }
