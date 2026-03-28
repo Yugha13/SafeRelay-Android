@@ -670,6 +670,7 @@ class ChatViewModel(
      * Mirrors iOS SafeRelay viewModel.sendSOS().
      */
     fun sendEmergencyMessage(message: SafeRelayMessage) {
+        Log.i("ChatViewModel", "🚨 sendEmergencyMessage triggered: type=${message.emergencyType}, sender=${message.sender}")
         // Enforce SOS cooldown for actual SOS alerts (but not for SAFE status updates)
         if (message.emergencyType == EmergencyMessageType.SOS) {
             if (isSosCooldownActive()) {
@@ -693,6 +694,8 @@ class ChatViewModel(
                     batteryPercent = message.batteryLevel ?: 100
                 )
                 // Broadcast SOS over BLE mesh for relay
+                fun triggerSos(payload: SosRelayPayload) {
+        Log.i(TAG, "🚨 LOCAL SOS trigger sequence started: sosId=${payload.sosId}, hops=${payload.hopCount}")
                 meshService.triggerSos(relayPayload)
 
                 // Direct upload to Supabase sos_alerts table (fast path)
