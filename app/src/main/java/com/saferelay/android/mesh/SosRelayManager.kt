@@ -60,6 +60,7 @@ class SosRelayManager(
      * Broadcasts immediately and queues for Supabase.
      */
     fun triggerSos(payload: SosRelayPayload) {
+        Log.i(TAG, "🚨 LOCAL SOS trigger sequence started: sosId=${payload.sosId}")
         Log.i(TAG, "🆘 LOCAL SOS triggered: sosId=${payload.sosId}, loc=${payload.latitude},${payload.longitude}")
 
         // Mark as seen so we don't re-process our own SOS when it bounces back
@@ -83,6 +84,7 @@ class SosRelayManager(
      * Deduplicates, displays, stores for upload, and re-broadcasts.
      */
     fun onSosReceived(payload: SosRelayPayload) {
+        Log.d(TAG, "📥 SOS relay packet received: sosId=${payload.sosId.take(8)}, hops=${payload.hopCount}")
         // ── Dedup ──
         if (seenSosIds.contains(payload.sosId)) {
             Log.d(TAG, "SOS ${payload.sosId.take(8)} already seen, skipping")
@@ -111,8 +113,9 @@ class SosRelayManager(
             val relayPayload = payload.copy(hopCount = nextHop)
             broadcastSosPacket(relayPayload)
             Log.d(TAG, "Re-broadcasting SOS ${payload.sosId.take(8)} at hop $nextHop")
+            Log.i(TAG, "🔁 Relaying SOS ${relayPayload.sosId.take(8)} to mesh (next hop: $nextHop)")
         } else {
-            Log.d(TAG, "SOS ${payload.sosId.take(8)} reached max hops (${payload.hopCount}), not re-broadcasting")
+            Log.d(TAG, "SOS ${payload.sosId.take(8)} reached max hops (${payload.hopCount}), not re-broadcasted")
         }
 
         // Kick off sync worker for incoming relay
