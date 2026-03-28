@@ -694,8 +694,7 @@ class ChatViewModel(
                     batteryPercent = message.batteryLevel ?: 100
                 )
                 // Broadcast SOS over BLE mesh for relay
-                fun triggerSos(payload: SosRelayPayload) {
-        Log.i(TAG, "🚨 LOCAL SOS trigger sequence started: sosId=${payload.sosId}, hops=${payload.hopCount}")
+                Log.i("ChatViewModel", "🚨 LOCAL SOS trigger sequence started: sosId=${relayPayload.sosId}, hops=${relayPayload.hopCount}")
                 meshService.triggerSos(relayPayload)
 
                 // Direct upload to Supabase sos_alerts table (fast path)
