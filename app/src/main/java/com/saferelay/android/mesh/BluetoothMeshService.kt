@@ -55,7 +55,7 @@ class BluetoothMeshService(private val context: Context) {
     internal val connectionManager = BluetoothConnectionManager(context, myPeerID, fragmentManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID)
     /** SOS store-and-forward relay manager. Public for SosSyncWorker access. */
-    val sosRelayManager = SosRelayManager(myPeerID)
+    val sosRelayManager = SosRelayManager(context.applicationContext, myPeerID)
     private lateinit var gossipSyncManager: GossipSyncManager
     // Service-level notification manager for background (no-UI) DMs
     private val serviceNotificationManager = com.saferelay.android.ui.NotificationManager(

@@ -8,6 +8,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.serializer.KotlinXSerializer
+import io.github.jan.supabase.http.httpConfig
+import io.ktor.client.engine.okhttp.*
 import kotlinx.serialization.json.Json
 
 /**
@@ -35,6 +37,13 @@ object SupabaseModule {
                 install(Auth)
                 install(Realtime)
                 install(Storage)
+
+                // Force all Supabase traffic through the Tor-aware OkHttp client
+                httpConfig {
+                    engine = OkHttp.create {
+                        preconfigured = OkHttpProvider.httpClient()
+                    }
+                }
                 
                 defaultSerializer = KotlinXSerializer(Json {
                     ignoreUnknownKeys = true
@@ -42,7 +51,7 @@ object SupabaseModule {
                     coerceInputValues = true
                 })
             }
-            android.util.Log.i("SupabaseModule", "SupabaseClient initialized successfully.")
+            android.util.Log.i("SupabaseModule", "SupabaseClient initialized successfully with Tor proxy.")
         } catch (e: Exception) {
             android.util.Log.e("SupabaseModule", "Failed to initialize SupabaseClient", e)
         }

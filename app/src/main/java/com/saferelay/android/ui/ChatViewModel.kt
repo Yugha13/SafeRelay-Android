@@ -704,15 +704,9 @@ class ChatViewModel(
                                 .from(com.saferelay.android.util.AppConstants.SosRelay.SUPABASE_TABLE)
                                 .upsert(relayPayload)
                             Log.i(TAG, "✅ SOS uploaded directly to Supabase: ${relayPayload.sosId.take(8)}")
-                        } else {
-                            Log.w(TAG, "Supabase client null — SOS queued for later upload")
-                            // Will be picked up by SosSyncWorker when internet is available
-                            com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
                         }
                     } catch (e: Exception) {
-                        Log.w(TAG, "Direct SOS upload failed (${e.message}) — queued for retry")
-                        // Already in SosRelayManager queue from triggerSos → SosSyncWorker will retry
-                        com.saferelay.android.sync.SosSyncWorker.enqueue(getApplication())
+                        Log.w(TAG, "Direct SOS upload failed (${e.message}) — background worker will retry")
                     }
                 }
             } else {

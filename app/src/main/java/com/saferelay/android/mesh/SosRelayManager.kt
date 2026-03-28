@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import com.saferelay.android.sync.SosSyncWorker
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Collections
 
@@ -28,7 +29,10 @@ import java.util.Collections
  *
  * Battery-conscious: no extra BLE scanning — piggybacks on existing mesh cycle.
  */
-class SosRelayManager(private val myPeerID: String) {
+class SosRelayManager(
+    private val context: android.content.Context,
+    private val myPeerID: String
+) {
 
     companion object {
         private const val TAG = "SosRelayManager"
@@ -69,6 +73,9 @@ class SosRelayManager(private val myPeerID: String) {
 
         // Emit for local UI (map markers etc.)
         scope.launch { _incomingSosAlerts.emit(payload) }
+
+        // Kick off sync worker
+        SosSyncWorker.enqueue(context)
     }
 
     /**
@@ -107,6 +114,9 @@ class SosRelayManager(private val myPeerID: String) {
         } else {
             Log.d(TAG, "SOS ${payload.sosId.take(8)} reached max hops (${payload.hopCount}), not re-broadcasting")
         }
+
+        // Kick off sync worker for incoming relay
+        SosSyncWorker.enqueue(context)
     }
 
     /**
