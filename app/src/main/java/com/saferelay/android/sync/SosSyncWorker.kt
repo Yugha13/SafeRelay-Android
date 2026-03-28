@@ -85,7 +85,7 @@ object SosSyncWorker {
                     if (msg.contains("duplicate") || msg.contains("23505") || msg.contains("conflict", ignoreCase = true)) {
                         Log.d(TAG, "SOS ${payload.sosId.take(8)} already in Supabase, dropping from queue")
                     } else {
-                        Log.w(TAG, "Failed to upload SOS ${payload.sosId.take(8)}: $msg")
+                        Log.w(TAG, "Failed to upload SOS ${payload.sosId.take(8)} to '${AppConstants.SosRelay.SUPABASE_TABLE}': $msg", e)
                         sosRelayManager.pendingUploads.add(payload)
                     }
                 }
@@ -94,7 +94,7 @@ object SosSyncWorker {
             Log.i(TAG, "SOS sync complete: $uploaded/${payloads.size} uploaded")
 
         } catch (e: Exception) {
-            Log.e(TAG, "SOS sync failed: ${e.message}")
+            Log.e(TAG, "SOS sync failed: ${e.message}", e)
         } finally {
             running = false
         }

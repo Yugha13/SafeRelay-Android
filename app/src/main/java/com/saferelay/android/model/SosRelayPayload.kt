@@ -47,6 +47,7 @@ data class SosRelayPayload(
     @SerialName("triggered_at")
     val timestampMs: Long = System.currentTimeMillis(),
 
+    @kotlinx.serialization.Transient
     @SerialName("hop_count")
     val hopCount: Int = 0
 ) {

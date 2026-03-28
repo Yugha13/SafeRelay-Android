@@ -48,9 +48,9 @@ object SupabaseModule {
                     coerceInputValues = true
                 })
             }
-            android.util.Log.i("SupabaseModule", "SupabaseClient initialized successfully with Tor proxy.")
+            android.util.Log.i("SupabaseModule", "SupabaseClient initialized successfully with Tor proxy (OkHttp).")
         } catch (e: Exception) {
-            android.util.Log.e("SupabaseModule", "Failed to initialize SupabaseClient", e)
+            android.util.Log.e("SupabaseModule", "Failed to initialize SupabaseClient with credentials: url=${url.take(15)}..., key=${key.take(10)}...", e)
         }
     }
 
