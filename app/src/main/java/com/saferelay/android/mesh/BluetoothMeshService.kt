@@ -250,7 +250,9 @@ class BluetoothMeshService(private val context: Context) {
         // SosRelayManager delegate
         sosRelayManager.delegate = object : SosRelayDelegate {
             override fun broadcastSosPacket(packet: SafeRelayPacket) {
-                connectionManager.broadcastPacket(RoutedPacket(packet))
+                // Sign the packet before broadcasting to mesh
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                connectionManager.broadcastPacket(RoutedPacket(signedPacket))
             }
         }
         
